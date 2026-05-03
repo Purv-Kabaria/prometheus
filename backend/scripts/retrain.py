@@ -212,19 +212,52 @@ def retrain(
 
     model = TCN(n_features=len(FEATURE_COLS)).to(device)
     state = torch.load(tcn_path, map_location=device, weights_only=True)
-    model.load_state_dict(state)
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    if missing:
+        log(f"   (weights not loaded for {len(missing)} keys — fresh init for those)", step="LOAD")
     log("✓ TCN weights loaded (warm-start)", step="LOAD")
 
     # ── 2. Feature engineering ───────────────────────────────────────────────
     section("STEP 2/7 · Building features")
     log(f"Reading CSV : {data_path}", step="FEAT")
     new_df  = pd.read_csv(data_path)
+    new_df.columns = [str(c).strip() for c in new_df.columns]
     n_raw   = len(new_df)
-    log(f"Raw rows    : {n_raw}", step="FEAT")
+    log(f"Raw rows (upload) : {n_raw}", step="FEAT")
 
-    feat_df = build_features(new_df)
+    # Load gold_standard for lag context (needed for lag_168h etc.)
+    gold_path = data_path.parent.parent / "data" / "gold_standard.csv"
+    if not gold_path.exists():
+        gold_path = model_dir.parent / "data" / "gold_standard.csv"
+
+    if gold_path.exists():
+        gold_df = pd.read_csv(gold_path)
+        gold_df.columns = [str(c).strip() for c in gold_df.columns]
+        combined_df = pd.concat([gold_df, new_df], ignore_index=True)
+        log(f"Combined with gold ({len(gold_df)} rows) = {len(combined_df)} total rows", step="FEAT")
+    else:
+        combined_df = new_df
+        log("gold_standard.csv not found — using upload only", step="FEAT")
+
+    feat_df = build_features(combined_df)
     n_feat  = len(feat_df)
     log(f"After feats : {n_feat} rows", step="FEAT")
+
+    # Only keep rows corresponding to the new upload timestamps
+    new_df["_dt"] = pd.to_datetime(new_df["Start time UTC"], utc=True)
+    new_ts_set = set(new_df["_dt"].dropna())
+    feat_df["_dt_check"] = pd.to_datetime(feat_df["datetime"], utc=True)
+    feat_new = feat_df[feat_df["_dt_check"].isin(new_ts_set)].copy()
+    n_new = len(feat_new)
+    log(f"New rows for training : {n_new} (from upload)", step="FEAT")
+
+    # Fall back to full combined set if no new rows matched (e.g. small upload)
+    if n_new < 2:
+        log("Too few new-only rows — training on full combined feature set", step="FEAT")
+        feat_new = feat_df
+
+    n_feat = len(feat_new)
+    feat_df = feat_new
 
     if n_feat < 2:
         raise ValueError(

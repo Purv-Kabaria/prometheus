@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import uuid
+import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Optional
@@ -98,6 +99,7 @@ def validate_and_merge(new_df: pd.DataFrame) -> pd.DataFrame:
     5. Concat + dedup → write back.
     """
     # --- 1. Column validation ---
+    new_df.columns = [str(c).strip() for c in new_df.columns]
     missing = [c for c in REQUIRED_COLS if c not in new_df.columns]
     if missing:
         raise ValueError(
@@ -129,15 +131,20 @@ def validate_and_merge(new_df: pd.DataFrame) -> pd.DataFrame:
     # --- 4. Continuity against existing store ---
     if DATA_STORE.exists():
         existing_df = pd.read_csv(DATA_STORE)
-        existing_df["_dt"] = pd.to_datetime(existing_df["Start time UTC"], utc=True)
-        last_ts  = existing_df["_dt"].max()
-        first_new = new_df["_dt"].min()
-        gap = first_new - last_ts
-
-        if gap > EXPECTED_FREQ:
-            raise ValueError(
-                f"Gap detected! Existing data ends at {last_ts}, "
-                f"new data starts at {first_new} "
+        existing_df.columns = [str(c).strip() for c in existing_df.columns]
+        
+        if "Start time UTC" in existing_df.columns and not existing_df.empty:
+            existing_df["_dt"] = pd.to_datetime(existing_df["Start time UTC"], utc=True)
+            last_ts  = existing_df["_dt"].max()
+            first_new = new_df["_dt"].min()
+            
+            if pd.notna(last_ts) and pd.notna(first_new):
+                gap = first_new - last_ts
+                
+                if gap > EXPECTED_FREQ:
+                    raise ValueError(
+                        f"Gap detected! Existing data ends at {last_ts}, "
+                        f"new data starts at {first_new} "
                 f"(gap = {gap}). Expected ≤ {EXPECTED_FREQ}."
             )
         if gap < timedelta(0):
@@ -167,10 +174,11 @@ def validate_and_merge(new_df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Subprocess launcher — the key piece
 # ---------------------------------------------------------------------------
-async def _spawn_retrain(job_id: str, data_path: str, new_version: str, parent_version: str) -> None:
+def _spawn_retrain(job_id: str, data_path: str, new_version: str, parent_version: str) -> None:
     """
-    Launches retrain.py as a child process via asyncio.create_subprocess_exec.
-    This is fire-and-monitor: FastAPI is never blocked.
+    Launches retrain.py as a child process via subprocess.Popen.
+    Since this runs in a FastAPI BackgroundTask, it executes in a threadpool
+    and does NOT block the main event loop.
     """
     log_path = MODEL_DIR / new_version / "train.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -193,21 +201,22 @@ async def _spawn_retrain(job_id: str, data_path: str, new_version: str, parent_v
 
     JOBS[job_id]["status"] = "running"
 
-    log_fh = open(log_path, "w")
-    proc = subprocess.Popen(
-        cmd,
-        stdout=log_fh,
-        stderr=subprocess.STDOUT,   # merge stderr into same log
-    )
-    JOBS[job_id]["pid"] = proc.pid
-    JOBS[job_id]["log_path"] = str(log_path)
+    with open(log_path, "w", encoding="utf-8") as log_fh:
+        env = os.environ.copy()
+        env["PYTHONUTF8"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
+        
+        proc = subprocess.Popen(
+            cmd,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,   # merge stderr into same log
+            env=env
+        )
+        JOBS[job_id]["pid"] = proc.pid
+        JOBS[job_id]["log_path"] = str(log_path)
 
-    # Wait in background — still non-blocking for the event loop using to_thread
-    def wait_proc():
-        return proc.wait()
-
-    return_code = await asyncio.to_thread(wait_proc)
-    log_fh.close()
+        # Wait in background thread — non-blocking for the event loop
+        return_code = proc.wait()
 
     if return_code == 0:
         JOBS[job_id]["status"] = "done"
@@ -237,12 +246,15 @@ async def upload_data(
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv files are accepted.")
 
+    logger.info("Received upload request for file %s", file.filename)
+
     # Save upload
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     safe_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_{file.filename}"
     temp_path = UPLOAD_DIR / safe_name
     with open(temp_path, "wb") as buf:
         shutil.copyfileobj(file.file, buf)
+    logger.info("Saved uploaded file to %s", temp_path)
 
     new_ids: list = []
     # Validate & merge (synchronous — fast, IO-bound)
@@ -311,9 +323,13 @@ def get_job_status(job_id: str):
     # Also surface the last few lines of the log for quick debugging
     log_path = job.get("log_path")
     if log_path and Path(log_path).exists():
-        with open(log_path) as lf:
-            lines = lf.readlines()
-        response["log_tail"] = "".join(lines[-30:])
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as lf:
+                lines = lf.readlines()
+            response["log_tail"] = "".join(lines[-30:])
+        except Exception as exc:
+            logger.warning("Failed to read log %s: %s", log_path, exc)
+            response["log_tail"] = ""
 
     return response
 
