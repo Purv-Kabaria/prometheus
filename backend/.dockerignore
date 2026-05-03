@@ -1,0 +1,8 @@
+__pycache__
+*.pyc
+.env
+notebooks/
+analysis/
+Adani_Datasets/
+scratch/
+.git

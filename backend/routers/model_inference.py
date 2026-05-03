@@ -23,6 +23,7 @@ import random
 import pickle
 import logging
 import os
+from functools import lru_cache
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Tuple
@@ -67,6 +68,21 @@ MODEL_STATUS: Dict[str, Dict] = {
     "tcn_xgb":   {"loaded": False, "error": None, "mape": "1.54%", "state": "Gujarat"},
 }
 
+ADANI_KEYS = {
+    "adani_catboost": {"file": "adani_catboost_model.pkl", "name": "Adani CatBoost", "type": "Gradient Boosting", "desc": "CatBoost model trained on Adani dataset"},
+    "adani_lightgbm": {"file": "adani_lightgbm_model.pkl", "name": "Adani LightGBM", "type": "Gradient Boosting", "desc": "LightGBM model trained on Adani dataset"},
+    "adani_prophet": {"file": "adani_prophet_model.pkl", "name": "Adani Prophet", "type": "Time Series", "desc": "Prophet model trained on Adani dataset"},
+    "adani_stacking": {"file": "adani_stacking_ensemble_model.pkl", "name": "Adani Stacking Ensemble", "type": "Ensemble", "desc": "Stacking ensemble trained on Adani dataset"},
+    "adani_ultimate": {"file": "adani_ultimate_covid_tuned_ensemble.pkl", "name": "Adani Ultimate Tuned", "type": "Ensemble", "desc": "Covid-tuned ensemble on Adani dataset"},
+    "adani_voting": {"file": "adani_voting_ensemble_model.pkl", "name": "Adani Voting Ensemble", "type": "Ensemble", "desc": "Voting ensemble on Adani dataset"},
+    "adani_xgboost": {"file": "adani_xgboost_model.pkl", "name": "Adani XGBoost", "type": "Gradient Boosting", "desc": "XGBoost trained on Adani dataset"},
+}
+
+for key in ADANI_KEYS:
+    MODEL_STATUS[key] = {"loaded": False, "error": None, "mape": "N/A", "state": "Adani/Gujarat"}
+
+_adani_models: Dict[str, Any] = {}
+
 # ── LightGBM loader ──────────────────────────────────────────────────────────
 def _load_lgbm() -> bool:
     global _lgbm_models
@@ -99,10 +115,19 @@ def _load_tcn_xgb() -> bool:
             _tcn_meta = json.load(f)
 
         # Scalers
-        with open(_SCALER_X, "rb") as f:
-            _scaler_x = pickle.load(f)
-        with open(_SCALER_Y, "rb") as f:
-            _scaler_y = pickle.load(f)
+        import joblib
+        try:
+            _scaler_x = joblib.load(str(_SCALER_X))
+        except Exception:
+            with open(_SCALER_X, "rb") as f:
+                _scaler_x = pickle.load(f)
+
+        try:
+            _scaler_y = joblib.load(str(_SCALER_Y))
+        except Exception:
+            with open(_SCALER_Y, "rb") as f:
+                _scaler_y = pickle.load(f)
+
 
         # XGB corrector
         import xgboost as xgb
@@ -125,17 +150,18 @@ def _load_tcn_xgb() -> bool:
                 return self.relu(self.conv(x)[..., :x.shape[-1]])
 
         class _TCNModel(nn.Module):
-            def __init__(self, n_features, window, hidden=64):
+            def __init__(self, n_features, window):
                 super().__init__()
-                self.blocks = nn.Sequential(
-                    _TCNBlock(n_features, hidden, dilation=1),
-                    _TCNBlock(hidden, hidden, dilation=2),
-                    _TCNBlock(hidden, hidden, dilation=4),
+                self.tcn = nn.Sequential(
+                    _TCNBlock(n_features, 64, dilation=1),
+                    _TCNBlock(64, 128, dilation=2),
+                    _TCNBlock(128, 64, dilation=4),
+                    _TCNBlock(64, 32, dilation=8),
                 )
-                self.fc = nn.Linear(hidden, 1)
+                self.fc = nn.Linear(32, 1)
             def forward(self, x):           # x: (B, T, F)
                 x = x.permute(0, 2, 1)      # (B, F, T)
-                x = self.blocks(x)
+                x = self.tcn(x)
                 x = x[:, :, -1]             # last timestep
                 return self.fc(x).squeeze(-1)
 
@@ -154,6 +180,32 @@ def _load_tcn_xgb() -> bool:
     except Exception as exc:
         MODEL_STATUS["tcn_xgb"]["error"] = str(exc)
         logger.warning(f"TCN+XGB load failed: {exc}")
+        return False
+
+
+# ── Adani Models Loader ──────────────────────────────────────────────────────
+def _load_adani_model(key: str) -> bool:
+    if key in _adani_models:
+        return True
+    try:
+        import pickle
+        import joblib
+        path = _ROOT / "forecasting" / ADANI_KEYS[key]["file"]
+        
+        try:
+            with open(path, "rb") as f:
+                model = pickle.load(f)
+        except Exception:
+            # Fallback to joblib (solves invalid load key \x0a etc)
+            model = joblib.load(str(path))
+            
+        _adani_models[key] = model
+        MODEL_STATUS[key]["loaded"] = True
+        logger.info(f"{key} model loaded OK")
+        return True
+    except Exception as exc:
+        MODEL_STATUS[key]["error"] = str(exc)
+        logger.warning(f"{key} load failed: {exc}")
         return False
 
 
@@ -204,8 +256,44 @@ def _tcn_features(hour: int, weekday: int) -> list:
             roll_mean, roll_std, diff_1h]
 
 
+def _adani_features(hour: int, weekday: int) -> list:
+    import math
+    from datetime import datetime
+    dayofweek = weekday
+    is_weekend = 1 if dayofweek >= 5 else 0
+    hour_sin = math.sin(2 * math.pi * hour / 24)
+    hour_cos = math.cos(2 * math.pi * hour / 24)
+    month = datetime.now().month
+    month_sin = math.sin(2 * math.pi * month / 12)
+    month_cos = math.cos(2 * math.pi * month / 12)
+    
+    base = BASE_MW_GJ * HOUR_PROFILE[hour] * DAY_FACTOR[weekday]
+    lag_1 = BASE_MW_GJ * HOUR_PROFILE[(hour - 1) % 24] * DAY_FACTOR[weekday]
+    lag_24 = base
+    lag_168 = base * DAY_FACTOR[(weekday - 7) % 7] / max(DAY_FACTOR[weekday], 0.01)
+    
+    rolling_mean_24 = base
+    rolling_std_24 = base * 0.02
+    is_business_hour = 1 if 9 <= hour <= 18 and not is_weekend else 0
+    is_holiday = 0
+    ema_12 = base
+    ema_24 = base
+    diff_1 = base - lag_1
+    diff_24 = 0
+    rolling_max_24 = base * 1.05
+    rolling_max_168 = base * 1.05
+
+    return [
+        dayofweek, is_weekend, hour_sin, hour_cos, month_sin, month_cos,
+        lag_1, lag_24, lag_168, rolling_mean_24, rolling_std_24,
+        is_business_hour, is_holiday, ema_12, ema_24, diff_1, diff_24,
+        rolling_max_24, rolling_max_168
+    ]
+
+
 # ── Public interface ─────────────────────────────────────────────────────────
 
+@lru_cache(maxsize=2048)
 def predict_hourly(model_key: str, hour: int, weekday: int) -> Tuple[float, float, float]:
     """
     Return (p10, p50, p90) demand in MW for a given hour & weekday.
@@ -219,6 +307,11 @@ def predict_hourly(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
     if model_key == "tcn_xgb":
         if _load_tcn_xgb():
             return _predict_tcn_xgb(hour, weekday)
+        model_key = "synthetic"
+        
+    if model_key in ADANI_KEYS:
+        if _load_adani_model(model_key):
+            return _predict_adani(model_key, hour, weekday)
         model_key = "synthetic"
 
     return _predict_synthetic(hour, weekday)
@@ -280,13 +373,48 @@ def _predict_tcn_xgb(hour: int, weekday: int) -> Tuple[float, float, float]:
         return _predict_synthetic(hour, weekday)
 
 
+def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, float, float]:
+    import numpy as np
+    import pandas as pd
+    from datetime import datetime, timedelta
+    
+    try:
+        model = _adani_models[model_key]
+        if model_key == "adani_prophet":
+            now = datetime.now()
+            days_ahead = (weekday - now.weekday()) % 7
+            mock_date = now + timedelta(days=days_ahead)
+            mock_date = mock_date.replace(hour=hour, minute=0, second=0, microsecond=0)
+            
+            feat = np.array([_adani_features(hour, weekday)])
+            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168']
+            df = pd.DataFrame(feat, columns=feature_names)
+            df['ds'] = [mock_date]
+            
+            pred = model.predict(df)
+            p50 = float(pred['yhat'].iloc[0])
+        else:
+            feat = np.array([_adani_features(hour, weekday)])
+            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168']
+            df = pd.DataFrame(feat, columns=feature_names)
+            p50 = float(model.predict(df)[0])
+            
+        p50 = max(5_000, min(25_000, p50))
+        p10 = round(p50 * 0.95, 1)
+        p90 = round(p50 * 1.05, 1)
+        return p10, round(p50, 1), p90
+    except Exception as exc:
+        logger.warning(f"{model_key} predict failed: {exc}, falling back to synthetic")
+        return _predict_synthetic(hour, weekday)
+
+
 def get_model_registry() -> list:
     """Return metadata about all available models for the /models endpoint."""
     # Trigger lazy loads so status is fresh
     _load_lgbm()
     _load_tcn_xgb()
 
-    return [
+    registry = [
         {
             "key": "synthetic",
             "name": "Synthetic Baseline",
@@ -319,5 +447,21 @@ def get_model_registry() -> list:
             "quantiles": False,
             "loaded": MODEL_STATUS["tcn_xgb"]["loaded"],
             "error": MODEL_STATUS["tcn_xgb"]["error"],
-        },
+        }
     ]
+
+    for key, info in ADANI_KEYS.items():
+        _load_adani_model(key)
+        registry.append({
+            "key": key,
+            "name": info["name"],
+            "description": info["desc"],
+            "type": info["type"],
+            "state": MODEL_STATUS[key]["state"],
+            "mape": MODEL_STATUS[key]["mape"],
+            "quantiles": False,
+            "loaded": MODEL_STATUS[key]["loaded"],
+            "error": MODEL_STATUS[key]["error"],
+        })
+
+    return registry

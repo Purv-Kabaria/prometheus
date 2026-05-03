@@ -12,10 +12,10 @@ from routers.forecast import router as forecast_router
 # New Pipeline router from upstream
 from routers import pipeline as pipeline_router
 # Operational Intelligence routers
-from routes.live import router as live_router
-from routes.performance import router as performance_router
-from routes.reports import router as reports_router
-from routes.history import router as history_router
+from routers.live import router as live_router
+from routers.performance import router as performance_router
+from routers.reports import router as reports_router
+from routers.history import router as history_router
 
 # DB init
 from services.storage import init_db
@@ -77,7 +77,7 @@ app.include_router(history_router)
 @app.on_event("startup")
 async def startup_event():
     init_db()
-    print("✅ Prometheus API started — DB initialized.")
+    print("Prometheus API started - DB initialized.")
 
 
 @app.get("/")
