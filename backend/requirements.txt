@@ -22,6 +22,7 @@ uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
 python-dateutil
 httpx
+python-dotenv
 
 # --- ML & Performance ---
 torch>=2.2.0

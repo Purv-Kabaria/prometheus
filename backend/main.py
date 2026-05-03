@@ -2,9 +2,13 @@ import logging
 import os
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 try:
@@ -62,11 +66,12 @@ if not os.path.exists("models/registry.json"):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ── Include All Routers ──────────────────────────────────────────────────────
 if agent_router is not None:

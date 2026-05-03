@@ -16,25 +16,45 @@ DB_PATH = Path(__file__).parent.parent / "data" / "predictions.db"
 
 # ── pure helpers ──────────────────────────────────────────────────────────────
 
-def _load_window(days: int) -> pd.DataFrame:
+from .model_inference import predict_hourly
+from fastapi import Query
+
+def _load_window(days: int, model: str = "default") -> pd.DataFrame:
     if not DB_PATH.exists():
         return pd.DataFrame()
     conn = sqlite3.connect(DB_PATH)
-    max_ts = pd.read_sql_query("SELECT MAX(timestamp) as max_ts FROM predictions", conn).iloc[0]["max_ts"]
-    if not max_ts:
+    max_ts_query = pd.read_sql_query("SELECT MAX(timestamp) as max_ts FROM predictions", conn)
+    if max_ts_query.empty or max_ts_query.iloc[0]["max_ts"] is None:
         conn.close()
         return pd.DataFrame()
+    
+    max_ts = max_ts_query.iloc[0]["max_ts"]
 
     df = pd.read_sql_query(
         f"""
         SELECT * FROM predictions
         WHERE timestamp >= date('{max_ts}', '-{days} days')
           AND actual IS NOT NULL
-          AND predicted_p50 IS NOT NULL
         """,
         conn,
     )
     conn.close()
+    
+    if df.empty:
+        return df
+
+    if model != "default":
+        # Recalculate predictions for the selected model
+        p_list = []
+        for _, row in df.iterrows():
+            ts = pd.to_datetime(row["timestamp"])
+            _, p50, _ = predict_hourly(model, ts.hour, ts.weekday())
+            p_list.append(p50)
+        df["predicted_p50"] = p_list
+    else:
+        # Filter rows where predicted_p50 is NULL if using default
+        df = df[df["predicted_p50"].notnull()]
+        
     return df
 
 
@@ -64,14 +84,14 @@ def _drift(m7: dict, m90: dict) -> tuple[str, str]:
     return "stable", "✅ No drift detected. Model retraining not needed."
 
 
-def _weekly_trend() -> list:
+def _weekly_trend(model: str = "default") -> list:
     if not DB_PATH.exists():
         return []
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query(
         """
         SELECT * FROM predictions
-        WHERE actual IS NOT NULL AND predicted_p50 IS NOT NULL
+        WHERE actual IS NOT NULL
         ORDER BY timestamp
         """,
         conn,
@@ -79,32 +99,47 @@ def _weekly_trend() -> list:
     conn.close()
     if df.empty:
         return []
+    
+    if model != "default":
+        p_list = []
+        for _, row in df.iterrows():
+            ts = pd.to_datetime(row["timestamp"])
+            _, p50, _ = predict_hourly(model, ts.hour, ts.weekday())
+            p_list.append(p50)
+        df["predicted_p50"] = p_list
+    else:
+        df = df[df["predicted_p50"].notnull()]
+
+    if df.empty:
+        return []
+
     df["ts"] = pd.to_datetime(df["timestamp"])
     df["week"] = df["ts"].dt.strftime("W%V")
     rows = []
     for week, grp in df.groupby("week"):
         m = _metrics(grp)
         rows.append({"week": week, **{k: m[k] for k in ("mae", "rmse", "mape")}})
-    return rows[-13:]  # last ~90 days worth of weeks
+    return rows[-13:]
 
 
 # ── endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("")
-def get_performance():
-    df7  = _load_window(7)
-    df30 = _load_window(30)
-    df90 = _load_window(90)
+def get_performance(model: str = Query(default="default")):
+    df7  = _load_window(7, model)
+    df30 = _load_window(30, model)
+    df90 = _load_window(90, model)
     m7, m30, m90 = _metrics(df7), _metrics(df30), _metrics(df90)
     drift_status, drift_msg = _drift(m7, m90)
     return {
         "current": {"7d": m7, "30d": m30, "90d": m90},
         "drift_status": drift_status,
         "drift_message": drift_msg,
-        "trend": _weekly_trend(),
+        "trend": _weekly_trend(model),
     }
 
 
 @router.get("/trend")
-def get_trend():
-    return {"trend": _weekly_trend()}
+def get_trend(model: str = Query(default="default")):
+    return {"trend": _weekly_trend(model)}
+

@@ -48,65 +48,77 @@ export default function AnomalyAlertBar() {
         left: 0,
         right: 0,
         zIndex: 50,
-        background: "linear-gradient(90deg, #7f1d1d 0%, #b91c1c 50%, #991b1b 100%)",
-        color: "#fff",
-        padding: "10px 20px",
-        fontSize: "14px",
+        background: "var(--accent)",
+        borderBottom: "1px solid var(--surface-border)",
+        color: "var(--foreground)",
+        padding: "12px 24px",
+        fontSize: "13px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "16px",
+        gap: "24px",
         flexWrap: "wrap",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
       }}
     >
-      <span style={{ fontWeight: 700 }}>Demand spike alert</span>
-      <span style={{ opacity: 0.95 }}>
-        {visible.length} unacknowledged anomaly{visible.length === 1 ? "" : "ies"} (
-        {visible.filter((x) => x.severity === "high").length} high severity)
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "var(--primary)", opacity: 0.8 }}></div>
+        <span style={{ fontWeight: 600 }}>Grid Stability Warning</span>
+      </div>
+      <span style={{ color: "var(--muted)" }}>
+        {visible.length} unacknowledged anomalies detected. Curtailment review recommended for current generation cycle.
       </span>
+      
+      <div style={{ display: "flex", gap: "8px" }}>
+        {visible.slice(0, 2).map((a) => (
+          <div
+            key={a.id}
+            style={{
+              background: "rgba(230, 126, 34, 0.05)",
+              border: "1px solid rgba(230, 126, 34, 0.1)",
+              padding: "4px 12px",
+              borderRadius: "4px",
+              fontSize: "11px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            {a.kind} · {a.timestamp_utc?.slice(11, 16) || ""}
+            <button
+              type="button"
+              onClick={(e) => ack(a.id, e)}
+              style={{
+                border: "none",
+                background: "none",
+                color: "var(--primary)",
+                padding: "0 4px",
+                fontSize: "10px",
+                fontWeight: 700,
+                cursor: "pointer",
+                textTransform: "uppercase"
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        ))}
+      </div>
+
       <Link
         href="/anomaly"
         style={{
-          color: "#fecaca",
-          textDecoration: "underline",
+          color: "var(--primary)",
+          textDecoration: "none",
           fontWeight: 600,
+          fontSize: "12px",
+          borderLeft: "1px solid var(--surface-border)",
+          paddingLeft: "24px"
         }}
       >
-        Open anomaly console
+        Open Review Console →
       </Link>
-      {visible.slice(0, 3).map((a) => (
-        <span
-          key={a.id}
-          style={{
-            background: "rgba(0,0,0,0.2)",
-            padding: "4px 10px",
-            borderRadius: "8px",
-            fontSize: "12px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          {a.kind} z={a.z_score} @ {a.timestamp_utc?.slice(5, 16) || ""}
-          <button
-            type="button"
-            onClick={(e) => ack(a.id, e)}
-            style={{
-              border: "none",
-              background: "#fff",
-              color: "#991b1b",
-              borderRadius: "6px",
-              padding: "2px 8px",
-              fontSize: "11px",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Ack
-          </button>
-        </span>
-      ))}
     </div>
   );
 }
+
