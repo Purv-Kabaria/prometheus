@@ -4,48 +4,82 @@ export default function ProposalCard({ proposal, onAccept, onReject, onOverride 
   if (!proposal) return null;
   
   return (
-    <div className="border border-purple-200 rounded-lg p-5 bg-white shadow-sm mb-4 transition-all hover:border-purple-300 hover:shadow-md">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xl">
+    <div style={{
+      background: "var(--surface)",
+      border: "1px solid var(--surface-border)",
+      borderRadius: "var(--radius)",
+      padding: "24px",
+      marginBottom: "20px",
+      transition: "all 0.2s ease"
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{ 
+            width: "40px", 
+            height: "40px", 
+            borderRadius: "8px", 
+            background: "var(--accent)", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            color: "var(--primary)",
+            fontWeight: "700" 
+          }}>
             A
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">Agent Proposal: {proposal.action_type.toUpperCase()}</h3>
-            <span className="text-xs text-gray-500">ID: {proposal.id}</span>
+            <h3 className="serif" style={{ fontSize: "16px", fontWeight: "400", margin: 0 }}>
+              Agent Proposal: {proposal.action_type.toUpperCase()}
+            </h3>
+            <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "500" }}>ID: {proposal.id}</span>
           </div>
         </div>
-        <span className="text-xs font-semibold px-3 py-1 bg-green-100 text-green-800 rounded-full border border-green-200">
+        <span style={{ 
+          fontSize: "10px", 
+          fontWeight: "700", 
+          padding: "4px 12px", 
+          background: "var(--accent)", 
+          color: "var(--success)", 
+          borderRadius: "20px",
+          border: "1px solid var(--surface-border)"
+        }}>
           92% Confidence
         </span>
       </div>
       
-      <div className="bg-gray-50 border border-gray-100 rounded p-3 mb-4">
-        <p className="text-sm text-gray-700 leading-relaxed">
-          <strong>Rationale:</strong> {proposal.rationale}
+      <div style={{ 
+        background: "var(--accent)", 
+        padding: "16px", 
+        borderRadius: "8px", 
+        marginBottom: "24px",
+        border: "1px solid var(--surface-border)"
+      }}>
+        <p style={{ fontSize: "14px", color: "var(--foreground)", lineHeight: "1.6", margin: 0 }}>
+          <strong style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>Rationale:</strong><br />
+          {proposal.rationale}
         </p>
       </div>
       
-      <div className="flex items-center justify-between mt-2 pt-3 border-t border-gray-100">
-        <div className="text-sm font-medium text-gray-800 bg-blue-50 px-3 py-1.5 rounded text-blue-800 border border-blue-100">
+      <div style={{ display: "flex", alignItems: "center", justifySpaceBetween: "space-between", marginTop: "12px", paddingTop: "20px", borderTop: "1px solid var(--surface-border)" }}>
+        <div style={{ fontSize: "13px", fontWeight: "600", color: "var(--primary)", background: "var(--accent)", padding: "8px 16px", borderRadius: "6px" }}>
           Target: {proposal.target_mwh} MWh @ {proposal.target_hour}
         </div>
-        <div className="flex gap-2">
+        <div style={{ display: "flex", gap: "12px", marginLeft: "auto" }}>
           <button 
             onClick={() => onReject(proposal)}
-            className="px-4 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded border border-red-200 transition-colors"
+            style={{ fontSize: "13px", fontWeight: "600", color: "var(--danger)", padding: "8px 16px" }}
           >
             Reject
           </button>
           <button 
             onClick={() => onOverride(proposal)}
-            className="px-4 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-colors"
+            style={{ fontSize: "13px", fontWeight: "600", color: "var(--muted)", padding: "8px 16px" }}
           >
             Override
           </button>
           <button 
             onClick={() => onAccept(proposal)}
-            className="px-4 py-1.5 text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 rounded transition-colors shadow-sm"
+            style={{ background: "var(--primary)", color: "white", padding: "8px 24px", borderRadius: "8px", fontSize: "13px", fontWeight: "600" }}
           >
             Accept Proposal
           </button>

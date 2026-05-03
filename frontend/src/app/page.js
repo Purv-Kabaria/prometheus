@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Card from '../components/Card';
 import ProposalCard from '../components/agent/ProposalCard';
 import FeedbackModal from '../components/agent/FeedbackModal';
 
@@ -11,6 +12,9 @@ export default function GridOfficerDashboard() {
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalState, setModalState] = useState({ isOpen: false, proposal: null, mode: null });
+  const [userPrompt, setUserPrompt] = useState('');
+  const [agentResponse, setAgentResponse] = useState(null);
+  const [telemetry, setTelemetry] = useState({ demand: null, generation: null });
 
   const fetchProposals = async () => {
     try {
@@ -18,23 +22,50 @@ export default function GridOfficerDashboard() {
       const data = await res.json();
       setProposals(data.proposals || []);
     } catch (err) {
-      console.error("Failed to fetch proposals. Ensure backend is running.", err);
+      console.error("Failed to fetch proposals.", err);
     }
   };
 
-  // Fetch proposals on initial load
+  const fetchTelemetry = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/forecast/24h');
+      const data = await res.json();
+      const currentHour = new Date().getHours();
+      const currentSlot = data.slots?.[currentHour];
+      const peakMw = data.summary?.peak_mw;
+      if (currentSlot) {
+        setTelemetry({
+          demand: currentSlot.p50,
+          generation: peakMw ? Math.round(peakMw * 1.10) : null
+        });
+      }
+    } catch (err) { /* silently fail */ }
+  };
+
   useEffect(() => {
     fetchProposals();
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 60000); // refresh every minute
+    return () => clearInterval(interval);
   }, []);
 
   const triggerAgent = async () => {
     setLoading(true);
+    setAgentResponse(null);
     try {
-      await fetch(`${API_BASE}/trigger`, { method: 'POST' });
-      await fetchProposals(); // Refresh to show the new proposal
+      const body = userPrompt.trim() ? { prompt: userPrompt.trim() } : {};
+      const res = await fetch(`${API_BASE}/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.details?.final_response) {
+        setAgentResponse(data.details.final_response);
+      }
+      await fetchProposals();
     } catch (err) {
       console.error("Failed to trigger agent:", err);
-      alert("Failed to connect to backend. Make sure FastAPI is running on port 8000.");
     }
     setLoading(false);
   };
@@ -46,7 +77,7 @@ export default function GridOfficerDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proposal_id: proposal.id, status: 'accepted' })
       });
-      await fetchProposals(); // Refresh list after resolving
+      await fetchProposals();
     } catch (err) {
       console.error("Failed to accept proposal:", err);
     }
@@ -60,60 +91,102 @@ export default function GridOfficerDashboard() {
         body: JSON.stringify(feedbackData)
       });
       setModalState({ isOpen: false, proposal: null, mode: null });
-      await fetchProposals(); // Refresh list after resolving
+      await fetchProposals();
     } catch (err) {
       console.error("Failed to submit feedback:", err);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 p-8 font-sans">
-      <header className="mb-10 flex justify-between items-center max-w-5xl mx-auto border-b border-gray-200 pb-6">
+    <div style={{ paddingBottom: "80px" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "48px" }}>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Prometheus Grid Control</h1>
-          <p className="text-gray-500 mt-1">Agent-Assisted Decisions Dashboard</p>
+          <h1 className="serif" style={{ fontSize: "36px", fontWeight: "400", marginBottom: "8px" }}>Grid Control</h1>
+          <p style={{ color: "var(--muted)", fontSize: "15px" }}>Real-time operational intelligence and control center</p>
         </div>
-        <button 
-          onClick={triggerAgent}
-          disabled={loading}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {loading ? (
-            <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-          ) : null}
-          {loading ? 'Simulating...' : 'Trigger Agent Simulation'}
-        </button>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button 
+            onClick={triggerAgent}
+            disabled={loading}
+            style={{ 
+              background: "var(--primary)", 
+              color: "white", 
+              padding: "10px 24px", 
+              borderRadius: "8px", 
+              fontSize: "14px", 
+              fontWeight: "600",
+              opacity: loading ? 0.7 : 1,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px"
+            }}
+          >
+            {loading && <div style={{ width: "12px", height: "12px", border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>}
+            {loading ? 'Analyzing...' : 'Run Agent Scan'}
+          </button>
+        </div>
       </header>
 
-      <main className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+      {/* Institutional Prompt Input */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "8px", display: "flex", gap: "8px", marginBottom: "32px", boxShadow: "0 4px 12px rgba(0,0,0,0.03)" }}>
+        <input
+          type="text"
+          value={userPrompt}
+          onChange={e => setUserPrompt(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !loading && triggerAgent()}
+          placeholder="Inquire with Prometheus AI... (e.g., 'Analyze curtailment risks' or leave blank for general scan)"
+          style={{ flex: 1, border: "none", background: "transparent", padding: "12px 16px", outline: "none", fontSize: "14px", color: "var(--foreground)" }}
+        />
+        <button 
+          onClick={triggerAgent} 
+          disabled={loading}
+          style={{ background: "var(--accent)", color: "var(--primary)", padding: "0 24px", borderRadius: "6px", fontSize: "13px", fontWeight: "700" }}
+        >
+          {loading ? '...' : 'SEND'}
+        </button>
+      </div>
+
+      {/* Agent Response Panel */}
+      {agentResponse && (
+        <div style={{ background: "var(--accent)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "24px", marginBottom: "48px" }}>
+          <div style={{ display: "flex", gap: "16px" }}>
+            <span style={{ fontSize: "20px" }}>🤖</span>
+            <div>
+              <p style={{ fontSize: "10px", fontWeight: "700", color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>Prometheus Intelligence Report</p>
+              <p style={{ fontSize: "14px", color: "var(--foreground)", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>{agentResponse}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "48px" }}>
+        <Card title="Current Generation" value={telemetry.generation ? `${telemetry.generation.toLocaleString()} MW` : "5,000 MW"} subtext="84% capacity utilization" accentColor="var(--primary)" />
+        <Card title="System Demand" value={telemetry.demand ? `${telemetry.demand.toLocaleString()} MW` : "4,200 MW"} subtext="Nominal operating range" accentColor="var(--success)" />
+        <Card title="Forecast Accuracy" value="98.4%" subtext="Last 24h rolling average" accentColor="var(--primary)" />
+      </div>
+
+      <main style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "48px", alignItems: "start" }}>
         
-        {/* Left Column: Proposals Feed */}
-        <div className="md:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              Action Queue
-              <span className="bg-purple-100 text-purple-800 py-0.5 px-2.5 rounded-full text-sm font-bold">
-                {proposals.length}
-              </span>
-            </h2>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+            <h2 className="serif" style={{ fontSize: "24px", fontWeight: "400" }}>Strategic Proposals</h2>
+            <span style={{ background: "var(--accent)", color: "var(--primary)", fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px" }}>
+              {proposals.length} ACTIVE
+            </span>
           </div>
           
           {proposals.length === 0 ? (
-            <div className="bg-white border border-gray-200 border-dashed rounded-xl p-12 text-center shadow-sm">
-              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-              </div>
-              <h3 className="text-gray-900 font-medium mb-1">Grid is stable</h3>
-              <p className="text-gray-500 text-sm mb-4">No pending agent proposals requiring your attention.</p>
-              <button 
-                onClick={triggerAgent}
-                className="text-indigo-600 text-sm font-medium hover:text-indigo-800 underline"
-              >
-                Simulate an anomaly
-              </button>
+            <div style={{ 
+              background: "var(--surface)", 
+              border: "1px solid var(--surface-border)", 
+              borderRadius: "var(--radius)", 
+              padding: "60px", 
+              textAlign: "center" 
+            }}>
+              <p style={{ color: "var(--muted)", fontSize: "14px" }}>Grid status is nominal. No active intervention required.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               {proposals.map(prop => (
                 <ProposalCard 
                   key={prop.id}
@@ -127,66 +200,49 @@ export default function GridOfficerDashboard() {
           )}
         </div>
 
-        {/* Right Column: Grid State (Mocked) */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Current Grid State</h2>
-          
-          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Live Telemetry</h4>
-            
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Committed Generation</span>
-                  <span className="font-medium">5,000 MW</span>
+        <aside style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "24px" }}>
+            <h4 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "20px" }}>
+              System Health & Telemetry
+            </h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              {[
+                { label: "Committed Generation", value: telemetry.generation ? `${telemetry.generation.toLocaleString()} MW` : "—", status: "Nominal" },
+                { label: "Forecast Demand", value: telemetry.demand ? `${telemetry.demand.toLocaleString()} MW` : "—", status: "Nominal", warning: telemetry.demand > 12000 },
+                { label: "Frequency", value: "49.99 Hz", status: "Nominal" },
+                { label: "Reserve Margin", value: "18.5%", status: "Optimal" }
+              ].map(stat => (
+                <div key={stat.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>{stat.label}</span>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "13px", fontWeight: "600", color: stat.warning ? "var(--danger)" : "var(--foreground)" }}>{stat.value}</div>
+                    <div style={{ fontSize: "9px", color: stat.warning ? "var(--danger)" : "var(--success)", fontWeight: "700", textTransform: "uppercase" }}>{stat.status}</div>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5"><div className="bg-blue-500 h-1.5 rounded-full w-4/5"></div></div>
-              </div>
-              
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Current Demand</span>
-                  <span className="font-medium text-green-600">4,200 MW</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5"><div className="bg-green-500 h-1.5 rounded-full w-3/4"></div></div>
-              </div>
+              ))}
             </div>
-            
-            <div className="mt-5 p-3 bg-amber-50 rounded border border-amber-100">
-              <div className="flex gap-2">
-                <span className="text-amber-500">⚠️</span>
-                <p className="text-xs text-amber-800 leading-tight">
-                  <span className="font-semibold">Over-generation warning:</span> Forecast suggests demand will drop further due to high solar output.
+
+            {telemetry.generation && telemetry.demand && telemetry.generation > telemetry.demand * 1.15 && (
+              <div style={{ marginTop: "24px", padding: "12px", background: "var(--accent)", borderRadius: "8px", border: "1px solid var(--surface-border)" }}>
+                <p style={{ fontSize: "10px", color: "var(--warning)", lineHeight: "1.4", margin: 0 }}>
+                  <span style={{ fontWeight: "700" }}>Over-generation Alert:</span> Committed generation exceeds forecast demand by &gt;15%. Review curtailment proposals.
                 </p>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* New Operational Intelligence Card */}
-          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ops Summary</h4>
-              <Link href="/reporting" className="text-indigo-600 text-[10px] font-bold hover:underline">VIEW FULL</Link>
+          <div style={{ background: "var(--accent)", borderRadius: "var(--radius)", padding: "24px" }}>
+            <h4 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>
+              Quick Links
+            </h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <Link href="/forecasting" style={{ fontSize: "13px", color: "var(--foreground)", textDecoration: "none", fontWeight: "500" }}>→ Demand Forecasting</Link>
+              <Link href="/reporting" style={{ fontSize: "13px", color: "var(--foreground)", textDecoration: "none", fontWeight: "500" }}>→ Operational Reports</Link>
             </div>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="bg-green-50 text-green-700 p-2 rounded-lg font-bold text-xl">98.4%</div>
-              <div>
-                <p className="text-xs font-semibold">Forecast Accuracy</p>
-                <p className="text-[10px] text-gray-500">Last 24 hours</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => window.location.href = '/reporting'}
-              className="w-full py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-xs font-semibold text-gray-600 transition-colors"
-            >
-              Download Daily PDF
-            </button>
           </div>
-        </div>
-
+        </aside>
       </main>
 
-      {/* Render Modal if active */}
       {modalState.isOpen && (
         <FeedbackModal 
           proposal={modalState.proposal}
@@ -195,6 +251,13 @@ export default function GridOfficerDashboard() {
           onSubmit={handleModalSubmit}
         />
       )}
+      
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

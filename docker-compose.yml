@@ -28,13 +28,15 @@ services:
     image: ollama/ollama:latest
     ports:
       - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
     volumes:
       - ollama_data:/root/.ollama
     # This entrypoint starts the ollama server in the background, 
-    # waits 5 seconds for it to bind to the port, pulls the llama3 model, 
-    # and then keeps the container running using `wait`.
+    # and then continuously attempts to pull the model until successful, 
+    # preventing the container from crashing if a network timeout occurs.
     entrypoint: [ "/bin/sh", "-c" ]
-    command: [ "ollama serve & sleep 5 && ollama pull llama3 && wait" ]
+    command: [ "ollama serve & sleep 5 && (while ! ollama pull qwen2.5:3b; do echo 'Pull failed, retrying in 10s...'; sleep 10; done) & wait" ]
 
 volumes:
   ollama_data:

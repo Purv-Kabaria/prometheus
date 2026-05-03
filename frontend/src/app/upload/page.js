@@ -4,22 +4,22 @@ import { useState, useRef, useCallback } from 'react';
 
 const API_BASE = 'http://localhost:8000';
 
-const STATUS_COLOR = {
-  pending:  { bg: '#1e293b', text: '#94a3b8', dot: '#64748b' },
-  running:  { bg: '#1c2f4a', text: '#60a5fa', dot: '#3b82f6' },
-  done:     { bg: '#0f2a1e', text: '#34d399', dot: '#10b981' },
-  failed:   { bg: '#2d1515', text: '#f87171', dot: '#ef4444' },
+const STATUS_THEME = {
+  pending:  { bg: 'var(--accent)', text: 'var(--muted)', dot: 'var(--muted)' },
+  running:  { bg: 'rgba(59, 130, 246, 0.05)', text: 'var(--primary)', dot: 'var(--primary)' },
+  done:     { bg: 'rgba(34, 197, 94, 0.05)', text: 'var(--success)', dot: 'var(--success)' },
+  failed:   { bg: 'rgba(239, 68, 68, 0.05)', text: 'var(--danger)', dot: 'var(--danger)' },
 };
 
 export default function UploadPage() {
-  const [file, setFile]           = useState(null);
-  const [dragging, setDragging]   = useState(false);
+  const [file, setFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result, setResult]       = useState(null);   // upload response
+  const [result, setResult] = useState(null);   // upload response
   const [jobStatus, setJobStatus] = useState(null);   // polled status
-  const [polling, setPolling]     = useState(false);
-  const [error, setError]         = useState(null);
-  const [registry, setRegistry]   = useState(null);
+  const [polling, setPolling] = useState(false);
+  const [error, setError] = useState(null);
+  const [registry, setRegistry] = useState(null);
   const fileRef = useRef();
   const pollRef = useRef(null);
 
@@ -33,7 +33,7 @@ export default function UploadPage() {
 
   const pickFile = (f) => {
     if (!f.name.endsWith('.csv')) {
-      setError('Only .csv files are accepted.');
+      setError('Invalid format. Please upload a CSV file.');
       return;
     }
     setFile(f);
@@ -55,7 +55,7 @@ export default function UploadPage() {
     body.append('file', file);
 
     try {
-      const res  = await fetch(`${API_BASE}/pipeline/upload`, { method: 'POST', body });
+      const res = await fetch(`${API_BASE}/pipeline/upload`, { method: 'POST', body });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Upload failed');
       setResult(data);
@@ -73,7 +73,7 @@ export default function UploadPage() {
     clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const res  = await fetch(`${API_BASE}/pipeline/status/${jobId}`);
+        const res = await fetch(`${API_BASE}/pipeline/status/${jobId}`);
         const data = await res.json();
         setJobStatus(data);
         if (data.status === 'done' || data.status === 'failed') {
@@ -81,10 +81,9 @@ export default function UploadPage() {
           setPolling(false);
         }
       } catch { /* network blip — keep polling */ }
-    }, 1000);  // 1 s — snappy live log
+    }, 1000);
   };
 
-  // Extract completed STEP markers from log tail
   const parseSteps = (log = '') => {
     const steps = [
       { key: 'STEP 1', label: 'Load artefacts' },
@@ -101,32 +100,27 @@ export default function UploadPage() {
   // ── registry ──────────────────────────────────────────────────────────────
   const fetchRegistry = async () => {
     try {
-      const res  = await fetch(`${API_BASE}/pipeline/registry`);
+      const res = await fetch(`${API_BASE}/pipeline/registry`);
       const data = await res.json();
       setRegistry(data);
     } catch (err) {
-      setError('Could not reach API: ' + err.message);
+      setError('System registry unreachable.');
     }
   };
 
-  // ── helpers ───────────────────────────────────────────────────────────────
-  const statusTheme = jobStatus ? (STATUS_COLOR[jobStatus.status] || STATUS_COLOR.pending) : null;
+  const theme = jobStatus ? (STATUS_THEME[jobStatus.status] || STATUS_THEME.pending) : null;
   const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '—';
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', paddingBottom: 64 }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 80 }}>
 
-      {/* ── header ── */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px' }}>
-          📡 Data Ingestion &amp; Retrain
-        </h1>
-        <p style={{ color: 'var(--muted)', marginTop: 6, fontSize: 14 }}>
-          Upload a CSV, validate continuity, and trigger incremental model retraining.
-        </p>
+      {/* Header */}
+      <div style={{ marginBottom: "48px" }}>
+        <h1 className="serif" style={{ fontSize: "36px", fontWeight: "400", marginBottom: "8px" }}>Data ingestion</h1>
+        <p style={{ color: "var(--muted)", fontSize: "15px" }}>Upload operational telemetry for incremental model retraining</p>
       </div>
 
-      {/* ── drop zone ── */}
+      {/* Drop Zone */}
       <div
         id="drop-zone"
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -134,14 +128,14 @@ export default function UploadPage() {
         onDrop={onDrop}
         onClick={() => fileRef.current.click()}
         style={{
-          border: `2px dashed ${dragging ? 'var(--primary)' : 'var(--surface-border)'}`,
-          borderRadius: 16,
-          padding: '40px 24px',
+          border: `1px dashed ${dragging ? 'var(--primary)' : 'var(--surface-border)'}`,
+          borderRadius: "var(--radius)",
+          padding: '60px 24px',
           textAlign: 'center',
           cursor: 'pointer',
           background: dragging ? 'var(--accent)' : 'var(--surface)',
           transition: 'all 0.2s ease',
-          marginBottom: 20,
+          marginBottom: 24,
         }}
       >
         <input
@@ -151,252 +145,248 @@ export default function UploadPage() {
           style={{ display: 'none' }}
           onChange={(e) => e.target.files[0] && pickFile(e.target.files[0])}
         />
-        <div style={{ fontSize: 40, marginBottom: 10 }}>📂</div>
         {file ? (
           <div>
-            <p style={{ fontWeight: 600, fontSize: 15 }}>{file.name}</p>
-            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-              {(file.size / 1024).toFixed(1)} KB · Click to change
+            <p className="serif" style={{ fontSize: "20px", marginBottom: "4px" }}>{file.name}</p>
+            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
+              {(file.size / 1024).toFixed(1)} KB · Ready for ingestion
             </p>
           </div>
         ) : (
           <div>
-            <p style={{ fontWeight: 500, fontSize: 15 }}>Drop CSV here or click to browse</p>
-            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-              Required columns: Start time UTC · End time UTC · Electricity consumption (MWh)
+            <p style={{ fontWeight: "500", fontSize: "15px", marginBottom: "8px" }}>Select a CSV file to begin</p>
+            <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
+              Drag and drop or click to browse
             </p>
           </div>
         )}
       </div>
 
-      {/* ── required format hint ── */}
+      {/* Format Hint */}
       <div style={{
-        background: 'var(--accent)',
+        background: 'var(--surface)',
         border: '1px solid var(--surface-border)',
-        borderRadius: 10,
-        padding: '12px 16px',
-        marginBottom: 20,
-        fontSize: 12,
+        borderRadius: "var(--radius)",
+        padding: '20px',
+        marginBottom: 32,
+        fontSize: '12px',
         color: 'var(--muted)',
-        fontFamily: 'monospace',
       }}>
-        <strong style={{ color: 'var(--foreground)' }}>Expected format (hourly, UTC):</strong>
-        <br />
-        Start time UTC, End time UTC, Electricity consumption (MWh)<br />
-        2024-01-10 00:00:00+00:00, 2024-01-10 01:00:00+00:00, 4312.7<br />
-        2024-01-10 01:00:00+00:00, 2024-01-10 02:00:00+00:00, 4189.3
+        <p style={{ fontWeight: "700", color: "var(--foreground)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Expected schema</p>
+        <code style={{ display: "block", background: "var(--accent)", padding: "12px", borderRadius: "4px", lineHeight: "1.6" }}>
+          timestamp, value_mwh<br />
+          2024-01-10T00:00:00Z, 4312.7<br />
+          2024-01-10T01:00:00Z, 4189.3
+        </code>
       </div>
 
-      {/* ── action buttons ── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 48 }}>
         <button
-          id="upload-btn"
           onClick={upload}
           disabled={!file || uploading}
           style={{
             flex: 1,
-            padding: '13px 0',
-            borderRadius: 10,
-            background: !file || uploading ? 'var(--surface-border)' : 'var(--primary)',
+            padding: '12px 0',
+            borderRadius: 8,
+            background: !file || uploading ? 'var(--accent)' : 'var(--primary)',
             color: !file || uploading ? 'var(--muted)' : '#fff',
-            fontWeight: 600,
-            fontSize: 15,
+            fontWeight: "600",
+            fontSize: "14px",
             transition: 'all 0.2s',
             cursor: !file || uploading ? 'not-allowed' : 'pointer',
+            border: "none"
           }}
         >
-          {uploading ? '⏳ Uploading…' : '🚀 Upload & Retrain'}
+          {uploading ? 'Processing...' : 'Start retraining job'}
         </button>
 
         <button
-          id="registry-btn"
           onClick={fetchRegistry}
           style={{
-            padding: '13px 20px',
-            borderRadius: 10,
+            padding: '12px 24px',
+            borderRadius: 8,
             border: '1px solid var(--surface-border)',
             background: 'var(--surface)',
             color: 'var(--foreground)',
-            fontWeight: 500,
-            fontSize: 14,
+            fontWeight: "500",
+            fontSize: "14px",
             transition: 'background 0.2s',
+            cursor: "pointer"
           }}
         >
-          🗂 Registry
+          View registry
         </button>
       </div>
 
-      {/* ── error ── */}
+      {/* Error */}
       {error && (
         <div style={{
-          background: '#2d1515', border: '1px solid #7f1d1d',
-          borderRadius: 10, padding: '14px 16px', marginBottom: 20,
-          color: '#fca5a5', fontSize: 14,
+          background: 'rgba(239, 68, 68, 0.05)', border: '1px solid var(--danger)',
+          borderRadius: "var(--radius)", padding: '16px', marginBottom: 24,
+          color: 'var(--danger)', fontSize: 14,
         }}>
-          ❌ {error}
+          {error}
         </div>
       )}
 
-      {/* ── upload result card ── */}
-      {result && (
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--surface-border)',
-          borderRadius: 14, padding: 20, marginBottom: 20,
-        }}>
-          <h3 style={{ fontWeight: 600, marginBottom: 12, fontSize: 15 }}>✅ Upload Accepted</h3>
-          <Row label="File"         value={result.filename} />
-          <Row label="Rows merged"  value={result.rows_merged} />
-          <Row label="New version"  value={result.new_version} mono />
-          <Row label="Job ID"       value={result.job_id} mono small />
-          <Row label="Status"       value={result.status} />
-        </div>
-      )}
-
-      {/* ── live job status ── */}
-      {jobStatus && statusTheme && (
-        <div style={{
-          background: statusTheme.bg,
-          border: `1px solid ${statusTheme.dot}44`,
-          borderRadius: 14, padding: 20, marginBottom: 20,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <span style={{
-              width: 10, height: 10, borderRadius: '50%',
-              background: statusTheme.dot,
-              boxShadow: `0 0 8px ${statusTheme.dot}`,
-              display: 'inline-block',
-              animation: polling ? 'pulse 1.5s infinite' : 'none',
-            }} />
-            <h3 style={{ fontWeight: 600, color: statusTheme.text, fontSize: 15 }}>
-              Training Job · {jobStatus.status.toUpperCase()}
-              {polling && ' (live)'}
-            </h3>
-          </div>
-
-          <Row label="Version"    value={jobStatus.version} mono />
-          <Row label="Parent"     value={jobStatus.parent}  mono />
-          <Row label="Started"    value={fmt(jobStatus.started_at)} />
-          {jobStatus.finished_at && <Row label="Finished" value={fmt(jobStatus.finished_at)} />}
-          {jobStatus.pid   && <Row label="PID"    value={jobStatus.pid} mono />}
-
-          {/* step progress pills */}
-          {jobStatus.log_tail && (() => {
-            const steps = parseSteps(jobStatus.log_tail);
-            const doneCount = steps.filter(s => s.done).length;
-            return (
-              <div style={{ marginTop: 14 }}>
-                <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-                  PROGRESS — {doneCount}/{steps.length} steps
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-                  {steps.map(s => (
-                    <span key={s.key} style={{
-                      padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
-                      background: s.done ? '#0f2a1e' : 'var(--accent)',
-                      color: s.done ? '#34d399' : 'var(--muted)',
-                      border: `1px solid ${s.done ? '#10b981' : 'var(--surface-border)'}`,
-                      transition: 'all 0.3s',
-                    }}>
-                      {s.done ? '✓' : '○'} {s.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* log tail */}
-          {jobStatus.log_tail && (
-            <div>
-              <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
-                LIVE LOG (last 30 lines)
-              </p>
-              <pre style={{
-                background: '#0a0a0a', borderRadius: 8, padding: '12px 14px',
-                fontSize: 11, color: '#a3e635', overflowX: 'auto',
-                maxHeight: 300, overflowY: 'auto', lineHeight: 1.7,
-                fontFamily: 'monospace',
-              }}>
-                {jobStatus.log_tail}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── registry panel ── */}
-      {registry && (
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--surface-border)',
-          borderRadius: 14, padding: 20,
-        }}>
-          <h3 style={{ fontWeight: 600, marginBottom: 14, fontSize: 15 }}>
-            🗂 Model Registry
-          </h3>
+      {/* Results & Status */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        {result && (
           <div style={{
-            display: 'inline-block', background: 'var(--primary)', color: '#fff',
-            borderRadius: 8, padding: '4px 12px', fontSize: 13, fontWeight: 600,
-            marginBottom: 16, fontFamily: 'monospace',
+            background: 'var(--surface)', border: '1px solid var(--surface-border)',
+            borderRadius: "var(--radius)", padding: "24px",
           }}>
-            Active: {registry.active_version}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {Object.entries(registry.versions).map(([ver, meta]) => (
-              <div key={ver} style={{
-                background: 'var(--accent)',
-                border: registry.active_version === ver
-                  ? '1px solid var(--primary)' : '1px solid var(--surface-border)',
-                borderRadius: 10, padding: '12px 16px',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+            <h3 className="serif" style={{ fontSize: "18px", marginBottom: "20px" }}>Ingestion accepted</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <Row label="Filename" value={result.filename} />
+              <Row label="Rows merged" value={result.rows_merged} />
+              <Row label="Model version" value={result.new_version} mono />
+              <Row label="Job identification" value={result.job_id} mono small />
+            </div>
+            
+            {result.anomalies_detected > 0 && (
+              <div style={{
+                marginTop: "24px", padding: '16px', borderRadius: "8px",
+                background: 'rgba(239, 68, 68, 0.05)', border: '1px solid var(--danger)',
+                color: 'var(--danger)', fontSize: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center'
               }}>
-                <div>
-                  <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 15 }}>{ver}</span>
-                  {registry.active_version === ver && (
-                    <span style={{
-                      marginLeft: 8, fontSize: 11, background: 'var(--primary)',
-                      color: '#fff', borderRadius: 4, padding: '2px 6px',
-                    }}>ACTIVE</span>
-                  )}
-                  {meta.parent && (
-                    <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>
-                      ← {meta.parent}
-                    </span>
-                  )}
-                  <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>
-                    {fmt(meta.created_at)} · MAPE: {meta.mape || '—'}
-                  </p>
-                </div>
-                {meta.note && (
-                  <span style={{ color: 'var(--muted)', fontSize: 12, fontStyle: 'italic' }}>
-                    {meta.note}
-                  </span>
-                )}
+                <span>⚠️ <strong>{result.anomalies_detected} anomalies</strong> detected in uploaded data.</span>
+                <a href="/anomaly" style={{
+                  background: 'var(--danger)', color: 'white', padding: '4px 12px',
+                  borderRadius: 6, fontWeight: 600, fontSize: 12, textDecoration: 'none'
+                }}>Review</a>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
+        )}
+
+        {jobStatus && theme && (
+          <div style={{
+            background: 'var(--surface)',
+            border: `1px solid var(--surface-border)`,
+            borderRadius: "var(--radius)", padding: "24px",
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "24px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: theme.dot,
+                  animation: polling ? 'pulse 2s infinite' : 'none',
+                }} />
+                <h3 className="serif" style={{ fontSize: "18px" }}>Retraining pipeline</h3>
+              </div>
+              <span style={{ 
+                background: "var(--accent)", color: theme.text, padding: "2px 10px", 
+                borderRadius: "4px", fontSize: "10px", fontWeight: "700", textTransform: "uppercase" 
+              }}>
+                {jobStatus.status}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
+              <Row label="Started at" value={fmt(jobStatus.started_at)} />
+              {jobStatus.finished_at && <Row label="Finished at" value={fmt(jobStatus.finished_at)} />}
+              <Row label="System PID" value={jobStatus.pid || "—"} mono />
+            </div>
+
+            {/* Pipeline progress bar */}
+            {jobStatus.log_tail && (() => {
+              const steps = parseSteps(jobStatus.log_tail);
+              const doneCount = steps.filter(s => s.done).length;
+              return (
+                <div style={{ marginTop: "32px" }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <span>Pipeline progress</span>
+                    <span>{doneCount} / {steps.length} steps</span>
+                  </div>
+                  <div style={{ height: '4px', background: 'var(--accent)', borderRadius: '2px', overflow: 'hidden', marginBottom: '24px' }}>
+                    <div style={{ height: '100%', width: `${(doneCount / steps.length) * 100}%`, background: 'var(--primary)', transition: 'width 0.5s ease' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {steps.map(s => (
+                      <div key={s.key} style={{
+                        display: "flex", alignItems: "center", gap: "12px",
+                        padding: "8px 0", borderBottom: "1px solid var(--accent)",
+                        opacity: s.done ? 1 : 0.4
+                      }}>
+                        <span style={{ color: s.done ? "var(--success)" : "var(--muted)", fontWeight: "700", fontSize: "12px" }}>
+                          {s.done ? "✓" : "○"}
+                        </span>
+                        <span style={{ fontSize: "13px" }}>{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Log Tail */}
+                  <div style={{ marginTop: "32px" }}>
+                    <p style={{ fontSize: "11px", color: 'var(--muted)', marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>Live execution log</p>
+                    <pre style={{
+                      background: 'var(--background)', borderRadius: '8px', padding: '16px',
+                      fontSize: '11px', color: 'var(--primary)', overflowX: 'auto',
+                      maxHeight: '200px', overflowY: 'auto', lineHeight: '1.6',
+                      fontFamily: 'monospace', border: '1px solid var(--surface-border)'
+                    }}>
+                      {jobStatus.log_tail}
+                    </pre>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Registry */}
+        {registry && (
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--surface-border)',
+            borderRadius: "var(--radius)", padding: "24px",
+          }}>
+            <h3 className="serif" style={{ fontSize: "20px", marginBottom: "24px" }}>Model registry</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {Object.entries(registry.versions).map(([ver, meta]) => (
+                <div key={ver} style={{
+                  padding: '16px',
+                  borderRadius: 8,
+                  background: 'var(--accent)',
+                  border: registry.active_version === ver ? '1px solid var(--primary)' : '1px solid transparent',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <div>
+                    <span style={{ fontWeight: "700", fontSize: "14px", fontFamily: "monospace" }}>{ver}</span>
+                    <p style={{ color: 'var(--muted)', fontSize: '12px', marginTop: '4px' }}>
+                      {fmt(meta.created_at)} · MAPE: {meta.mape || '—'}
+                    </p>
+                  </div>
+                  {registry.active_version === ver && (
+                    <span style={{ background: "var(--primary)", color: "#fff", fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "4px" }}>ACTIVE</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
+          50% { opacity: 0.4; }
         }
       `}</style>
     </div>
   );
 }
 
-// ── tiny helper ───────────────────────────────────────────────────────────────
 function Row({ label, value, mono = false, small = false }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
       <span style={{ color: 'var(--muted)' }}>{label}</span>
       <span style={{
         fontFamily: mono ? 'monospace' : 'inherit',
-        fontSize: small ? 12 : 14,
-        maxWidth: '60%', wordBreak: 'break-all', textAlign: 'right',
+        fontSize: small ? '11px' : '13px',
+        fontWeight: "500"
       }}>
         {value}
       </span>

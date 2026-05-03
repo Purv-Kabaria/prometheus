@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -193,16 +194,19 @@ async def _spawn_retrain(job_id: str, data_path: str, new_version: str, parent_v
     JOBS[job_id]["status"] = "running"
 
     log_fh = open(log_path, "w")
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
+    proc = subprocess.Popen(
+        cmd,
         stdout=log_fh,
-        stderr=asyncio.subprocess.STDOUT,   # merge stderr into same log
+        stderr=subprocess.STDOUT,   # merge stderr into same log
     )
     JOBS[job_id]["pid"] = proc.pid
     JOBS[job_id]["log_path"] = str(log_path)
 
-    # Wait in background — still non-blocking for the event loop
-    return_code = await proc.wait()
+    # Wait in background — still non-blocking for the event loop using to_thread
+    def wait_proc():
+        return proc.wait()
+
+    return_code = await asyncio.to_thread(wait_proc)
     log_fh.close()
 
     if return_code == 0:
@@ -293,6 +297,7 @@ async def upload_data(
         "new_version": new_v,
         "job_id":      job_id,
         "poll_status": f"/pipeline/status/{job_id}",
+        "anomalies_detected": len(new_ids),
     }
 
 
