@@ -30,6 +30,7 @@ export default function Sidebar() {
   const links = [
     { name: "Overview", href: "/" },
     { name: "Forecasting", href: "/forecasting" },
+    { name: "Forecasting Visualizations", href: "/forecasting-visuals" },
     { name: "Reporting", href: "/reporting" },
     { name: "Anomaly & Explain", href: "/anomaly" },
     { name: "Agent Decisions", href: "/agent" },
@@ -127,4 +128,3 @@ export default function Sidebar() {
     </div>
   );
 }
-
