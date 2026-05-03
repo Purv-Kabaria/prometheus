@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import ProposalCard from '../components/agent/ProposalCard';
 import FeedbackModal from '../components/agent/FeedbackModal';
 
@@ -159,6 +160,27 @@ export default function GridOfficerDashboard() {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* New Operational Intelligence Card */}
+          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ops Summary</h4>
+              <Link href="/reporting" className="text-indigo-600 text-[10px] font-bold hover:underline">VIEW FULL</Link>
+            </div>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-green-50 text-green-700 p-2 rounded-lg font-bold text-xl">98.4%</div>
+              <div>
+                <p className="text-xs font-semibold">Forecast Accuracy</p>
+                <p className="text-[10px] text-gray-500">Last 24 hours</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => window.location.href = '/reporting'}
+              className="w-full py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-xs font-semibold text-gray-600 transition-colors"
+            >
+              Download Daily PDF
+            </button>
           </div>
         </div>
 
