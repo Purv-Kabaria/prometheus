@@ -24,6 +24,12 @@ ROLLBACK = 168
 MIN_PRIOR = 12
 
 
+def _ollama_config() -> tuple[str, str]:
+    host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    model = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b").strip()
+    return host, model
+
+
 def _atomic_write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -136,7 +142,7 @@ def _detect_rows(
 def llm_batch_scan_notes(records: List[Dict[str, Any]]) -> None:
     if not records:
         return
-    base = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    base, model = _ollama_config()
     try:
         from langchain_community.chat_models import ChatOllama
         from langchain_core.prompts import ChatPromptTemplate
@@ -164,7 +170,7 @@ def llm_batch_scan_notes(records: List[Dict[str, Any]]) -> None:
         ]
     )
     try:
-        llm = ChatOllama(model="llama3", base_url=base, temperature=0.2)
+        llm = ChatOllama(model=model, base_url=base, temperature=0.2)
         chain = prompt | llm | StrOutputParser()
         text = chain.invoke({"anomalies": body})
         start = text.find("{")
@@ -265,7 +271,7 @@ def neighbor_context(timestamp_utc: str, before: int = 24, after: int = 6) -> st
 
 
 def explain_anomaly_with_llm(record: Dict[str, Any]) -> str:
-    base = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    base, model = _ollama_config()
     ctx = neighbor_context(record["timestamp_utc"])
     from langchain_community.chat_models import ChatOllama
     from langchain_core.prompts import ChatPromptTemplate
@@ -294,7 +300,7 @@ def explain_anomaly_with_llm(record: Dict[str, Any]) -> str:
             ),
         ]
     )
-    llm = ChatOllama(model="llama3", base_url=base, temperature=0.3)
+    llm = ChatOllama(model=model, base_url=base, temperature=0.3)
     chain = prompt | llm | StrOutputParser()
     return chain.invoke(
         {

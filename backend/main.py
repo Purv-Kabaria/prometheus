@@ -2,9 +2,13 @@ import logging
 import os
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 try:
