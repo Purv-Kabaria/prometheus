@@ -357,7 +357,7 @@ def forecast_explain(
     import math
     import random
 
-    # Derive feature values based on state inputs
+    # Derive feature values based on grid inputs
     features = {
         "sin_hour": round(math.sin(2 * math.pi * hour / 24), 3),
         "cos_hour": round(math.cos(2 * math.pi * hour / 24), 3),
