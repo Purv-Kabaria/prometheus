@@ -13,7 +13,7 @@
     "equipment_id": "ID123",
     "start_time": "now",
     "end_time": "now",
-    "status": "pending_approval"
+    "status": "rejected"
   },
   {
     "id": "maint_5399",
