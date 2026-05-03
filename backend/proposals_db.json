@@ -1,0 +1,10 @@
+[
+  {
+    "id": "prop_9758",
+    "action_type": "curtailment",
+    "target_mwh": 792.5,
+    "target_hour": "14:00",
+    "rationale": "[MCP Agent Decision] Forecast analysis complete. Predicted average demand is 4207 MW over the next 6 hours, while committed generation is 5000 MW. I utilized MCP tools to analyze this anomaly. I recommend curtailing 792.5 MW to prevent over-generation.",
+    "status": "pending_approval"
+  }
+]

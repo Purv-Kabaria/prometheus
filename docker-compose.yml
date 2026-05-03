@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+    # Volume map the database so proposals persist across backend container restarts
+    volumes:
+      - ./backend/proposals_db.json:/app/proposals_db.json
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # This entrypoint starts the ollama server in the background, 
+    # waits 5 seconds for it to bind to the port, pulls the llama3 model, 
+    # and then keeps the container running using `wait`.
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: [ "ollama serve & sleep 5 && ollama pull llama3 && wait" ]
+
+volumes:
+  ollama_data:
