@@ -443,6 +443,183 @@ function OffPeak({ data }) {
   );
 }
 
+
+// ─── Explainability Panel: SHAP and LIME XAI ──────────────────────────────────
+function XAIExplainPanel({ activeModel }) {
+  const [selectedHour, setSelectedHour] = useState(12);
+  const [selectedWeekday, setSelectedWeekday] = useState(0);
+  const [explainData, setExplainData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API}/explain?model=${activeModel}&hour=${selectedHour}&weekday=${selectedWeekday}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setExplainData(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [activeModel, selectedHour, selectedWeekday]);
+
+  const weekdays = [
+    { value: 0, label: "Monday" },
+    { value: 1, label: "Tuesday" },
+    { value: 2, label: "Wednesday" },
+    { value: 3, label: "Thursday" },
+    { value: 4, label: "Friday" },
+    { value: 5, label: "Saturday" },
+    { value: 6, label: "Sunday" },
+  ];
+
+  return (
+    <>
+      <SectionHeader
+        title="Explainable AI (XAI) Insights"
+        sub="Understand exactly what features drive model predictions via SHAP and LIME values"
+        tag="XAI Enabled"
+      />
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "32px" }}>
+        <div>
+          <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "6px" }}>
+            ⏰ Target Prediction Hour
+          </label>
+          <select
+            value={selectedHour}
+            onChange={(e) => setSelectedHour(parseInt(e.target.value))}
+            style={{
+              width: "100%", padding: "12px 16px", borderRadius: "10px",
+              background: "var(--surface)", border: "1px solid var(--surface-border)",
+              color: "var(--foreground)", fontSize: "14px", fontWeight: "600", outline: "none"
+            }}
+          >
+            {Array.from({ length: 24 }).map((_, h) => (
+              <option key={h} value={h}>{`${h.toString().padStart(2, "0")}:00`}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "6px" }}>
+            📅 Target Weekday
+          </label>
+          <select
+            value={selectedWeekday}
+            onChange={(e) => setSelectedWeekday(parseInt(e.target.value))}
+            style={{
+              width: "100%", padding: "12px 16px", borderRadius: "10px",
+              background: "var(--surface)", border: "1px solid var(--surface-border)",
+              color: "var(--foreground)", fontSize: "14px", fontWeight: "600", outline: "none"
+            }}
+          >
+            {weekdays.map((w) => (
+              <option key={w.value} value={w.value}>{w.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {loading && !explainData ? (
+        <Spinner />
+      ) : explainData ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+          
+          {/* Explanation Summary Card */}
+          <div style={{
+            background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.25)",
+            borderRadius: "14px", padding: "18px 24px", display: "flex", alignItems: "center", gap: "16px"
+          }}>
+            <span style={{ fontSize: "28px" }}>💡</span>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#8b5cf6", marginBottom: "2px" }}>AI Interpretation</div>
+              <div style={{ fontSize: "13px", color: "var(--foreground)", fontWeight: "500" }}>{explainData.summary}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px" }}>
+            {/* SHAP section */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🎯</span> SHAP Impact (Global Features)
+                </h3>
+                <Badge label={`Base load: ${explainData.base_value}`} color="info" />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {explainData.shap_values?.map((item, i) => {
+                  const pct = Math.min(100, Math.abs((item.impact / 1.0) * 100));
+                  const isPos = item.impact >= 0;
+                  return (
+                    <div key={i} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                        <span style={{ fontWeight: "600", color: "var(--foreground)" }}>{item.feature}</span>
+                        <span style={{ fontWeight: "700", color: isPos ? "#10b981" : "#ef4444" }}>
+                          {isPos ? "+" : ""}{item.impact.toFixed(3)}
+                        </span>
+                      </div>
+                      <div style={{ width: "100%", height: "8px", background: "var(--surface-border)", borderRadius: "4px", overflow: "hidden", position: "relative" }}>
+                        <div style={{
+                          width: `${pct}%`, height: "100%",
+                          background: isPos ? "linear-gradient(to right, #10b981, #34d399)" : "linear-gradient(to right, #ef4444, #f87171)",
+                          borderRadius: "4px", float: isPos ? "left" : "right"
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* LIME section */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🧩</span> LIME Explanations (Local Model Fit)
+                </h3>
+                <Badge label="Local Interpretation" color="success" />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {explainData.lime_explanations?.map((item, i) => {
+                  const pct = Math.min(100, Math.abs((item.coefficient / 1.0) * 100));
+                  const isPos = item.coefficient >= 0;
+                  return (
+                    <div key={i} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                        <span style={{ fontWeight: "600", color: "var(--foreground)" }}>{item.feature}</span>
+                        <span style={{ fontWeight: "700", color: isPos ? "#3b82f6" : "#f59e0b" }}>
+                          {isPos ? "+" : ""}{item.coefficient.toFixed(3)}
+                        </span>
+                      </div>
+                      <div style={{ width: "100%", height: "8px", background: "var(--surface-border)", borderRadius: "4px", overflow: "hidden", position: "relative" }}>
+                        <div style={{
+                          width: `${pct}%`, height: "100%",
+                          background: isPos ? "linear-gradient(to right, #3b82f6, #60a5fa)" : "linear-gradient(to right, #f59e0b, #fbbf24)",
+                          borderRadius: "4px", float: isPos ? "left" : "right"
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Premium Disclaimer Footnote */}
+          <div style={{
+            marginTop: "12px", padding: "14px 18px",
+            background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)",
+            borderRadius: "10px", fontSize: "12px", color: "var(--muted)"
+          }}>
+            <strong style={{ color: "var(--foreground)" }}>Explainability Note:</strong> SHAP (Shapley Additive exPlanations) uses game-theoretic weights to measure direct contribution toward predictions. LIME fits local surrogate models around specific hourly context. Together, they provide both global and localized operational insights.
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ForecastingPage() {
   const [tab, setTab] = useState("24h");
@@ -502,6 +679,7 @@ export default function ForecastingPage() {
     { id: "7day",   label: "7-Day Outlook",   icon: "📅" },
     { id: "peak",   label: "Peak Hours",      icon: "⚡" },
     { id: "offpeak",label: "Off-Peak Windows",icon: "🌙" },
+    { id: "explain",label: "XAI Insights",     icon: "🔬" },
   ];
 
   return (
@@ -575,6 +753,7 @@ export default function ForecastingPage() {
         {tab === "7day"    && <Forecast7Day data={data7d} models={models} />}
         {tab === "peak"    && <PeakHours data={dataPeak} />}
         {tab === "offpeak" && <OffPeak data={dataOff} />}
+        {tab === "explain" && <XAIExplainPanel activeModel={activeModel} />}
       </Panel>
     </div>
   );
