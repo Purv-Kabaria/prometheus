@@ -23,14 +23,24 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── internal helpers ──────────────────────────────────────────────────────────
 
-def _load_today() -> pd.DataFrame:
+def _load_range(start_ts: str = None, end_ts: str = None) -> pd.DataFrame:
     if not DB_PATH.exists():
         return pd.DataFrame()
     conn = sqlite3.connect(DB_PATH)
+    
+    if not start_ts or not end_ts:
+        # Fallback to latest day
+        max_ts = pd.read_sql_query("SELECT MAX(timestamp) as max_ts FROM predictions", conn).iloc[0]["max_ts"]
+        if not max_ts:
+            conn.close()
+            return pd.DataFrame()
+        start_ts = (pd.to_datetime(max_ts) - pd.Timedelta(days=1)).isoformat()
+        end_ts   = max_ts
+
     df = pd.read_sql_query(
-        """
+        f"""
         SELECT * FROM predictions
-        WHERE timestamp >= datetime('now', '-1 days')
+        WHERE timestamp >= '{start_ts}' AND timestamp <= '{end_ts}'
           AND actual IS NOT NULL
         """,
         conn,
@@ -39,50 +49,8 @@ def _load_today() -> pd.DataFrame:
     return df
 
 
-def _compute_metrics(df: pd.DataFrame) -> dict:
-    if df.empty:
-        return {"mae": 0.0, "rmse": 0.0, "mape": 0.0}
-    a = df["actual"].values.astype(float)
-    p = df["predicted_p50"].values.astype(float)
-    mask = (a != 0) & np.isfinite(a) & np.isfinite(p)
-    a, p = a[mask], p[mask]
-    if len(a) == 0:
-        return {"mae": 0.0, "rmse": 0.0, "mape": 0.0}
-    return {
-        "mae":  round(float(np.mean(np.abs(a - p))), 2),
-        "rmse": round(float(np.sqrt(np.mean((a - p) ** 2))), 2),
-        "mape": round(float(np.mean(np.abs((a - p) / a)) * 100), 2),
-    }
-
-
-def _detect_anomalies(df: pd.DataFrame) -> list:
-    """Flag hours where |residual| z-score > 2.5."""
-    if df.empty or "residual" not in df.columns:
-        return []
-    res = df["residual"].dropna().values.astype(float)
-    if len(res) < 3:
-        return []
-    mu, sigma = res.mean(), res.std()
-    if sigma == 0:
-        return []
-    anomalies = []
-    for _, row in df.iterrows():
-        r = row.get("residual")
-        if r is None or not np.isfinite(r):
-            continue
-        z = abs((r - mu) / sigma)
-        if z > 2.5:
-            ts = row.get("timestamp", "")
-            anomalies.append({
-                "timestamp": ts,
-                "residual":  round(float(r), 2),
-                "z_score":   round(float(z), 2),
-            })
-    return anomalies
-
-
-def _render_pdf(date_str: str, metrics: dict, anomalies: list, filepath: Path):
-    """Render the daily report to PDF using reportlab."""
+def _render_pdf(title: str, subtitle: str, metrics: dict, anomalies: list, filepath: Path):
+    """Render the report to PDF using reportlab."""
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
@@ -99,8 +67,8 @@ def _render_pdf(date_str: str, metrics: dict, anomalies: list, filepath: Path):
         # ── Title ──────────────────────────────────────────────────────────
         title_style = ParagraphStyle("title", parent=st["Title"], fontSize=22, spaceAfter=6)
         sub_style   = ParagraphStyle("sub",   parent=st["Normal"], fontSize=12, textColor=colors.grey, spaceAfter=20)
-        body.append(Paragraph("DAILY OPERATIONS REPORT", title_style))
-        body.append(Paragraph(f"Prometheus Grid Intelligence · {date_str}", sub_style))
+        body.append(Paragraph(title, title_style))
+        body.append(Paragraph(f"Prometheus Grid Intelligence · {subtitle}", sub_style))
 
         # ── Forecast Performance ────────────────────────────────────────────
         body.append(Paragraph("FORECAST PERFORMANCE", st["Heading2"]))
@@ -167,43 +135,127 @@ def _render_pdf(date_str: str, metrics: dict, anomalies: list, filepath: Path):
 
 # ── endpoints ─────────────────────────────────────────────────────────────────
 
+def _compute_metrics(df: pd.DataFrame) -> dict:
+    if df.empty:
+        return {"mae": 0.0, "rmse": 0.0, "mape": 0.0}
+    a = df["actual"].values.astype(float)
+    p = df["predicted_p50"].values.astype(float)
+    mask = (a != 0) & np.isfinite(a) & np.isfinite(p)
+    a, p = a[mask], p[mask]
+    if len(a) == 0:
+        return {"mae": 0.0, "rmse": 0.0, "mape": 0.0}
+    return {
+        "mae":  round(float(np.mean(np.abs(a - p))), 2),
+        "rmse": round(float(np.sqrt(np.mean((a - p) ** 2))), 2),
+        "mape": round(float(np.mean(np.abs((a - p) / a)) * 100), 2),
+    }
+
+
+def _detect_anomalies(df: pd.DataFrame) -> list:
+    """Flag hours where |residual| z-score > 2.5."""
+    if df.empty or "residual" not in df.columns:
+        return []
+    res = df["residual"].dropna().values.astype(float)
+    if len(res) < 3:
+        return []
+    mu, sigma = res.mean(), res.std()
+    if sigma == 0:
+        return []
+    anomalies = []
+    for _, row in df.iterrows():
+        r = row.get("residual")
+        if r is None or not np.isfinite(r):
+            continue
+        z = abs((r - mu) / sigma)
+        if z > 2.5:
+            ts = row.get("timestamp", "")
+            anomalies.append({
+                "timestamp": ts,
+                "residual":  round(float(r), 2),
+                "z_score":   round(float(z), 2),
+            })
+    return anomalies
+
+
 @router.get("")
 def list_reports():
     """List all generated reports with metadata."""
     reports = []
-    for f in sorted(REPORTS_DIR.glob("daily_report_*.pdf"), reverse=True):
-        date_part = f.stem.replace("daily_report_", "")
-        reports.append({"id": f.name, "name": "Daily Ops Summary", "date": date_part, "format": "PDF"})
-    for f in sorted(REPORTS_DIR.glob("weekly_report_*.pdf"), reverse=True):
-        date_part = f.stem.replace("weekly_report_", "")
-        reports.append({"id": f.name, "name": "Weekly Review", "date": date_part, "format": "PDF"})
-    # Sort combined list by date desc
-    reports.sort(key=lambda r: r["date"], reverse=True)
+    # Search for all PDF reports in the directory
+    for f in sorted(REPORTS_DIR.glob("*.pdf"), reverse=True):
+        name = "Daily Ops Summary"
+        if "hist_report" in f.name:
+            name = "Historical Intelligence"
+            
+        parts = f.stem.split("_")
+        date_part = "–"
+        time_part = "–"
+        
+        if "daily_report" in f.name and len(parts) >= 4:
+            date_part = parts[2]
+            time_part = parts[3].replace("-", ":")
+        elif "hist_report" in f.name and len(parts) >= 5:
+            # Format: hist_report_START_END_TIME.pdf
+            date_part = f"{parts[2]} to {parts[3]}"
+            time_part = parts[4][:2] + ":" + parts[4][2:4]
+            
+        reports.append({
+            "id": f.name,
+            "name": name,
+            "date": date_part,
+            "time": time_part,
+            "format": "PDF"
+        })
+            
     return reports
 
 
 @router.post("/generate")
-def generate_report(date: str = None):
-    """Generate a PDF report for today (or a given date)."""
-    date_str  = date or datetime.now().strftime("%Y-%m-%d")
-    filepath  = REPORTS_DIR / f"daily_report_{date_str}.pdf"
-    df        = _load_today()
-    metrics   = _compute_metrics(df)
+def generate_report(start: str = None, end: str = None):
+    """Generate a PDF report for a specific range or 'today'."""
+    now = datetime.now()
+    df = _load_range(start, end)
+    
+    if start and end:
+        title = "HISTORICAL INTELLIGENCE REPORT"
+        subtitle = f"{start} to {end}"
+        filename = f"hist_report_{start}_{end}_{now.strftime('%H%M%S')}.pdf"
+    else:
+        title = "DAILY OPERATIONS REPORT"
+        subtitle = datetime.now().strftime("%B %d, %Y")
+        filename = f"daily_report_{now.strftime('%Y-%m-%d_%H-%M-%S')}.pdf"
+
+    filepath = REPORTS_DIR / filename
+    metrics  = _compute_metrics(df)
     anomalies = _detect_anomalies(df)
-    _render_pdf(date_str, metrics, anomalies, filepath)
-    return {"status": "generated", "id": filepath.name, "date": date_str, "metrics": metrics}
+    _render_pdf(title, subtitle, metrics, anomalies, filepath)
+    
+    return {
+        "status": "generated", 
+        "id": filepath.name, 
+        "title": title,
+        "metrics": metrics
+    }
 
 
 @router.get("/today-summary")
 def today_summary():
-    """Quick preview card — no PDF needed."""
-    df        = _load_today()
+    """Quick preview card — uses the latest 24h of data."""
+    df        = _load_range()
     metrics   = _compute_metrics(df)
     anomalies = _detect_anomalies(df)
     accuracy  = round(100 - metrics["mape"], 1)
     hours_done = len(df)
+    
+    # Get the date from the DB
+    conn = sqlite3.connect(DB_PATH)
+    max_ts = pd.read_sql_query("SELECT MAX(timestamp) as max_ts FROM predictions", conn).iloc[0]["max_ts"]
+    conn.close()
+    
+    display_date = pd.to_datetime(max_ts).strftime("%B %d, %Y") if max_ts else "No Data"
+    
     return {
-        "date":       datetime.now().strftime("%B %d, %Y"),
+        "date":       display_date,
         "accuracy":   accuracy,
         "anomalies":  len(anomalies),
         "savings":    "₹2.4L",

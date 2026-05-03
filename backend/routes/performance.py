@@ -20,10 +20,15 @@ def _load_window(days: int) -> pd.DataFrame:
     if not DB_PATH.exists():
         return pd.DataFrame()
     conn = sqlite3.connect(DB_PATH)
+    max_ts = pd.read_sql_query("SELECT MAX(timestamp) as max_ts FROM predictions", conn).iloc[0]["max_ts"]
+    if not max_ts:
+        conn.close()
+        return pd.DataFrame()
+
     df = pd.read_sql_query(
         f"""
         SELECT * FROM predictions
-        WHERE timestamp >= datetime('now', '-{days} days')
+        WHERE timestamp >= date('{max_ts}', '-{days} days')
           AND actual IS NOT NULL
           AND predicted_p50 IS NOT NULL
         """,

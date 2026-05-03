@@ -49,19 +49,34 @@ def _synthetic(hour: int, weekday: int) -> Tuple[float, float, float]:
 
 # Feature vector order must match training exactly (see routers/model_inference.py)
 def _build_feat(row: pd.Series) -> np.ndarray:
+    """
+    Builds a 17-feature vector matching the training set.
+    """
     get = lambda k, default=0.0: float(row.get(k, default) or default)
-    base  = get("consumption_mwh", BASE_MW)
-    lag1  = get("lag_1",  base)
-    lag24 = get("lag_24", base)
-    lag168 = get("lag_168", base)
+    
+    # These must match routers/model_inference.py exactly
+    hour = int(get("hour"))
+    wd   = int(get("day_of_week"))
+    
+    # Use synthetic baseline for the 'base' feature, NOT actual consumption
+    # to avoid leakage and match the trained LightGBM's feature space.
+    base_synthetic = BASE_MW * HOUR_PROFILE[hour % 24] * DAY_FACTOR[wd % 7]
+    
+    lag1   = get("lag_1", base_synthetic)
+    lag24  = get("lag_24", base_synthetic)
+    lag168 = get("lag_168", base_synthetic)
+    
     feat = [
         get("hour_sin"), get("hour_cos"),
         get("month_sin"), get("month_cos"),
         get("day_sin"), get("day_cos"),
         get("hour"), get("day_of_week"), get("month"),
         lag1, lag24, lag168,
-        get("roll_mean_24h", base), get("roll_std_24h", base * 0.02),
-        base, lag1 - lag24, 0.0,
+        get("roll_mean_24h", base_synthetic), 
+        get("roll_std_24h", base_synthetic * 0.02),
+        base_synthetic,    # Index 14: Synthetic baseline
+        lag1 - lag24,      # Index 15: Lag diff
+        0.0,               # Index 16: Extra/Padding
     ]
     return np.array([feat])
 

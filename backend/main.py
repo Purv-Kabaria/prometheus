@@ -15,6 +15,7 @@ from routers import pipeline as pipeline_router
 from routes.live import router as live_router
 from routes.performance import router as performance_router
 from routes.reports import router as reports_router
+from routes.history import router as history_router
 
 # DB init
 from services.storage import init_db
@@ -70,6 +71,7 @@ app.include_router(pipeline_router.router)
 app.include_router(live_router)
 app.include_router(performance_router)
 app.include_router(reports_router)
+app.include_router(history_router)
 
 
 @app.on_event("startup")
