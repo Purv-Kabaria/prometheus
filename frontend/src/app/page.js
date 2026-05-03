@@ -1,65 +1,66 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useMemo } from "react";
+import Card from "@/components/Card";
+import { RAW_DATA, computeStats, fmt } from "@/utils/mockData";
+
+export default function OverviewPage() {
+  const data = RAW_DATA.Daily;
+  const stats = useMemo(() => computeStats(data), [data]);
+  const anomalies = useMemo(() => data.filter(d => d.value > stats.mean + 2 * stats.std), [data, stats]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div>
+      <header style={{ marginBottom: "40px", textAlign: "center" }}>
+        <h1 style={{ fontSize: "28px", fontWeight: "800", letterSpacing: "-0.02em", marginBottom: "4px" }}>Platform Overview</h1>
+        <p style={{ color: "var(--muted)", fontSize: "14px" }}>Grid Officer Product Features and capabilities summary.</p>
+      </header>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "40px", justifyContent: "center" }}>
+        <Card title="Total Consumption" value={`${fmt(stats.total)} MWh`} subtext="Last 90 days" type="default" />
+        <Card title="Peak Demand" value={`${fmt(stats.peak)} MWh`} subtext="Recorded yesterday at 14:00" type="warning" />
+        <Card title="Avg Daily Load" value={`${fmt(stats.mean.toFixed(1))} MWh`} />
+        <Card title="Detected Anomalies" value={anomalies.length} subtext="Requires review" type="danger" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+        <div style={{ background: "var(--surface)", padding: "24px", borderRadius: "var(--radius)", border: "1px solid var(--surface-border)" }}>
+          <h3 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Forecasting & Prediction</h3>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "12px", color: "var(--muted)", fontSize: "14px", listStyle: "inside" }}>
+            <li><strong style={{ color: "var(--foreground)" }}>24h Ahead Forecast:</strong> Hourly consumption predictions.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>7-Day Weekly Forecast:</strong> Rolling weekly outlook.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Peak Hour Prediction:</strong> Flags top 3 demand hours daily.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Off-Peak Window Prediction:</strong> Identifies low-demand windows.</li>
+          </ul>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div style={{ background: "var(--surface)", padding: "24px", borderRadius: "var(--radius)", border: "1px solid var(--surface-border)" }}>
+          <h3 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Anomaly Detection & Explainability</h3>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "12px", color: "var(--muted)", fontSize: "14px", listStyle: "inside" }}>
+            <li><strong style={{ color: "var(--foreground)" }}>Real-time Spike Alerts:</strong> Immediate alerts on deviation.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Natural Language Q&A:</strong> RAG-powered query support.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Anomaly History Log:</strong> Searchable timeline of anomalies.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Residual Tracking:</strong> Live chart of actual minus predicted.</li>
+          </ul>
         </div>
-      </main>
+        <div style={{ background: "var(--surface)", padding: "24px", borderRadius: "var(--radius)", border: "1px solid var(--surface-border)" }}>
+          <h3 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Agent-Assisted Decisions</h3>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "12px", color: "var(--muted)", fontSize: "14px", listStyle: "inside" }}>
+            <li><strong style={{ color: "var(--foreground)" }}>Decision Proposals:</strong> Recommended actions surfaced to officer.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Accept/Reject/Correct:</strong> One-click overriding.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Confidence Score:</strong> Model confidence % per proposal.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Maintenance Scheduling:</strong> Outage slot recommendations.</li>
+          </ul>
+        </div>
+        <div style={{ background: "var(--surface)", padding: "24px", borderRadius: "var(--radius)", border: "1px solid var(--surface-border)" }}>
+          <h3 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Insights & Reporting</h3>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "12px", color: "var(--muted)", fontSize: "14px", listStyle: "inside" }}>
+            <li><strong style={{ color: "var(--foreground)" }}>Live vs Predicted:</strong> Real-time charts overlay.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Seasonal Heatmap:</strong> Long-term pattern visualization.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>Cost & Waste:</strong> Savings estimator & over-generation alerts.</li>
+            <li><strong style={{ color: "var(--foreground)" }}>SHAP Explainability:</strong> Feature contribution insights.</li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
