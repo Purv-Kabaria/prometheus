@@ -3,7 +3,13 @@ import json
 import os
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from ollama import AsyncClient
+
+try:
+    from ollama import AsyncClient as _OllamaClient
+    _OLLAMA_AVAILABLE = True
+except ImportError:
+    _OllamaClient = None
+    _OLLAMA_AVAILABLE = False
 
 def mcp_tool_to_ollama(tool):
     """Convert an MCP Tool schema to Ollama's tool schema"""
@@ -20,6 +26,12 @@ async def run_mcp_agent_workflow():
     """
     Full Agentic Loop using Ollama as the brain and MCP as the tool provider.
     """
+    if not _OLLAMA_AVAILABLE:
+        return {
+            "status": "error",
+            "message": "Ollama Python package not installed. Run: pip install ollama",
+        }
+
     server_script = os.path.join(os.path.dirname(__file__), "mcp_server.py")
     
     server_params = StdioServerParameters(
@@ -38,7 +50,7 @@ async def run_mcp_agent_workflow():
     except Exception:
         return {"status": "error", "message": f"Ollama server is not responding at {ollama_host}. If running via Docker, it may still be downloading the llama3 model."}
 
-    ollama_client = AsyncClient(host=ollama_host)
+    ollama_client = _OllamaClient(host=ollama_host)
 
     try:
         async with stdio_client(server_params) as (read, write):

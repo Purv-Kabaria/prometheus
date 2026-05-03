@@ -1,3 +1,4 @@
+# --- Core ---
 numpy>=2.0.0
 pandas>=2.2.0
 scipy>=1.13.0
@@ -13,10 +14,25 @@ darts>=0.29.0
 arch>=6.3.0
 jupyterlab
 ipykernel
-mcp
-# --- ML Pipeline ---
-torch>=2.2.0
-xgboost>=2.0.0
+openpyxl
+
+# --- Web & API ---
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
+python-dateutil
+httpx
+
+# --- ML & Performance ---
+torch>=2.2.0
+torchvision
+torchaudio
+tqdm>=4.66.0
+lightgbm
+xgboost>=2.0.0
+joblib
+ollama
+
+# --- Intelligence & Reporting ---
+reportlab
+mcp

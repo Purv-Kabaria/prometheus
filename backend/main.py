@@ -1,12 +1,23 @@
-<<<<<<< HEAD
+import logging
+import os
+import json
+from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routers import agent, pipeline
-import os
-import json
-import logging
-from datetime import datetime, timezone
+
+# ── Routers ───────────────────────────────────────────────────────────────────
+from routers.agent import router as agent_router
+from routers.forecast import router as forecast_router
+# New Pipeline router from upstream
+from routers import pipeline as pipeline_router
+# Operational Intelligence routers
+from routes.live import router as live_router
+from routes.performance import router as performance_router
+from routes.reports import router as reports_router
+
+# DB init
+from services.storage import init_db
 
 # ── Suppress repetitive status-poll noise from uvicorn access log ────────────
 class _SuppressStatusPoll(logging.Filter):
@@ -19,8 +30,8 @@ logging.getLogger("uvicorn.access").addFilter(_SuppressStatusPoll())
 
 app = FastAPI(
     title="Prometheus Grid API",
-    description="ML pipeline + grid agent for Adani Prometheus hackathon",
-    version="1.0.0",
+    description="ML Pipeline & Operational Intelligence for Maharashtra Grid Officers",
+    version="2.1.0",
 )
 
 # Ensure local directories exist
@@ -28,7 +39,6 @@ os.makedirs("data/uploads", exist_ok=True)
 os.makedirs("models/final_submission", exist_ok=True)
 
 # Initialize Registry if not exists
-# v1 = the original trained model living in models/final_submission/
 if not os.path.exists("models/registry.json"):
     with open("models/registry.json", "w") as f:
         json.dump({
@@ -53,38 +63,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(agent.router)
-app.include_router(pipeline.router)
+# ── Include All Routers ──────────────────────────────────────────────────────
+app.include_router(agent_router)
+app.include_router(forecast_router)
+app.include_router(pipeline_router.router)
+app.include_router(live_router)
+app.include_router(performance_router)
+app.include_router(reports_router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+    print("✅ Prometheus API started — DB initialized.")
+
 
 @app.get("/")
-def read_root():
-    return {"status": "Prometheus API is running"}
+def root():
+    return {
+        "status": "Prometheus API is running",
+        "modules": ["Agent", "Forecasting", "Pipeline", "Operational Intelligence"],
+        "version": "2.1.0"
+    }
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-=======
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-from routers import agent, forecast
-
-app = FastAPI(title="Prometheus Grid API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(agent.router)
-app.include_router(forecast.router)
-
-@app.get("/")
-def read_root():
-    return {"status": "Prometheus API is running"}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
->>>>>>> 0abaa3537e9532517770ac0e361ba38829eb0ce3
