@@ -26,6 +26,8 @@ MIN_PRIOR = 12
 
 def _ollama_config() -> tuple[str, str]:
     host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    if not host.startswith("http://") and not host.startswith("https://"):
+        host = "http://" + host
     model = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b").strip()
     return host, model
 
@@ -144,7 +146,7 @@ def llm_batch_scan_notes(records: List[Dict[str, Any]]) -> None:
         return
     base, model = _ollama_config()
     try:
-        from langchain_community.chat_models import ChatOllama
+        from langchain_ollama import ChatOllama
         from langchain_core.prompts import ChatPromptTemplate
         from langchain_core.output_parsers import StrOutputParser
     except Exception as exc:
@@ -273,7 +275,7 @@ def neighbor_context(timestamp_utc: str, before: int = 24, after: int = 6) -> st
 def explain_anomaly_with_llm(record: Dict[str, Any]) -> str:
     base, model = _ollama_config()
     ctx = neighbor_context(record["timestamp_utc"])
-    from langchain_community.chat_models import ChatOllama
+    from langchain_ollama import ChatOllama
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
 

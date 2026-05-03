@@ -3,3 +3,4 @@ venv
 
 final_merged.csv
 all_years.csv
+.env
