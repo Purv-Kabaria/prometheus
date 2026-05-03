@@ -21,6 +21,10 @@ REPORTS_DIR  = Path(__file__).parent.parent / "data" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+from .model_inference import predict_hourly, get_model_registry
+
+LOGO_PATH = Path(__file__).parent.parent / "assets" / "Adani.png"
+
 # ── internal helpers ──────────────────────────────────────────────────────────
 
 def _load_range(start_ts: str = None, end_ts: str = None) -> pd.DataFrame:
@@ -49,87 +53,120 @@ def _load_range(start_ts: str = None, end_ts: str = None) -> pd.DataFrame:
     return df
 
 
-def _render_pdf(title: str, subtitle: str, metrics: dict, anomalies: list, filepath: Path):
+def _render_pdf(title: str, subtitle: str, model_results: list, anomalies: list, filepath: Path):
     """Render the report to PDF using reportlab."""
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
+        from reportlab.lib.enums import TA_CENTER
 
-        doc  = SimpleDocTemplate(str(filepath), pagesize=A4, topMargin=2*cm, bottomMargin=2*cm)
+        doc  = SimpleDocTemplate(str(filepath), pagesize=A4, topMargin=1*cm, bottomMargin=2*cm)
         st   = getSampleStyleSheet()
         body = []
 
+        # ── Logo ──────────────────────────────────────────────────────────
+        if LOGO_PATH.exists():
+            img = Image(str(LOGO_PATH), width=12*cm, height=4.5*cm)
+            img.hAlign = 'CENTER'
+            body.append(img)
+            body.append(Spacer(1, 15))
+
+
         # ── Title ──────────────────────────────────────────────────────────
-        title_style = ParagraphStyle("title", parent=st["Title"], fontSize=22, spaceAfter=6)
-        sub_style   = ParagraphStyle("sub",   parent=st["Normal"], fontSize=12, textColor=colors.grey, spaceAfter=20)
+        title_style = ParagraphStyle("title", parent=st["Title"], fontSize=24, spaceAfter=6, textColor=colors.HexColor("#d35400"), alignment=TA_CENTER)
+        sub_style   = ParagraphStyle("sub",   parent=st["Normal"], fontSize=12, textColor=colors.grey, spaceAfter=30, alignment=TA_CENTER)
         body.append(Paragraph(title, title_style))
-        body.append(Paragraph(f"Prometheus Grid Intelligence · {subtitle}", sub_style))
+        body.append(Paragraph(f"Prometheus Grid Intelligence | {subtitle}", sub_style))
 
         # ── Forecast Performance ────────────────────────────────────────────
-        body.append(Paragraph("FORECAST PERFORMANCE", st["Heading2"]))
+        body.append(Paragraph("MODEL PERFORMANCE COMPARISON", st["Heading2"]))
+        body.append(Spacer(1, 10))
+        
+        rows = [["Model", "MAE (MWh)", "RMSE (MWh)", "MAPE (%)", "Status"]]
         targets = {"mae": 3.0, "rmse": 4.0, "mape": 5.0}
-        rows = [["Metric", "Value", "Target", "Status"]]
-        for k, label, unit in [
-            ("mae",  "MAE",  "MWh"),
-            ("rmse", "RMSE", "MWh"),
-            ("mape", "MAPE", "%"),
-        ]:
-            v   = metrics.get(k, 0)
-            tgt = targets[k]
-            ok  = "✅ PASS" if v < tgt else "❌ FAIL"
-            rows.append([label, f"{v} {unit}", f"< {tgt}", ok])
+        
+        for m in model_results:
+            mae = m.get("mae", 0)
+            rmse = m.get("rmse", 0)
+            mape = m.get("mape", 0)
+            
+            # Simple status check
+            is_ok = mae < targets["mae"] and mape < targets["mape"]
+            status = "PASS" if is_ok else "REVIEW"
+            
+            rows.append([
+                m["name"], 
+                f"{mae:.2f}", 
+                f"{rmse:.2f}", 
+                f"{mape:.2f}", 
+                status
+            ])
 
-        t = Table(rows, colWidths=[3*cm, 4*cm, 4*cm, 3*cm])
+        t = Table(rows, colWidths=[5*cm, 3*cm, 3*cm, 3*cm, 3*cm])
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a1a2e")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d35400")),
             ("TEXTCOLOR",  (0, 0), (-1, 0), colors.white),
             ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
             ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
             ("GRID",       (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fcf8f4")]),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+            ("TOPPADDING", (0, 0), (-1, 0), 10),
         ]))
         body.append(t)
-        body.append(Spacer(1, 20))
+        body.append(Spacer(1, 25))
 
         # ── Anomalies ───────────────────────────────────────────────────────
         body.append(Paragraph(f"ANOMALIES DETECTED ({len(anomalies)})", st["Heading2"]))
+        body.append(Spacer(1, 10))
         if anomalies:
             arows = [["Timestamp", "Residual (MWh)", "Z-Score"]]
-            for a in anomalies[:10]:
+            for a in anomalies[:12]:
                 arows.append([a["timestamp"], str(a["residual"]), str(a["z_score"])])
-            at = Table(arows, colWidths=[6*cm, 4*cm, 4*cm])
+            at = Table(arows, colWidths=[7*cm, 4*cm, 4*cm])
             at.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e63946")),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#c0392b")),
                 ("TEXTCOLOR",  (0, 0), (-1, 0), colors.white),
                 ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("GRID",       (0, 0), (-1, -1), 0.5, colors.lightgrey),
                 ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
             ]))
             body.append(at)
         else:
-            body.append(Paragraph("No significant anomalies detected.", st["Normal"]))
-        body.append(Spacer(1, 20))
+            body.append(Paragraph("No significant anomalies detected in the selected period.", st["Normal"]))
+        body.append(Spacer(1, 25))
 
-        # ── Estimated Savings ───────────────────────────────────────────────
-        body.append(Paragraph("ESTIMATED SAVINGS", st["Heading2"]))
-        accuracy = round(100 - metrics.get("mape", 0), 1)
+        # ── Conclusion ──────────────────────────────────────────────────────
+        body.append(Paragraph("OPERATIONAL INSIGHTS", st["Heading2"]))
+        body.append(Spacer(1, 10))
+        
+        best_model = min(model_results, key=lambda x: x['mape']) if model_results else None
+        conclusion = (
+            f"During this period, the <b>{best_model['name']}</b> model demonstrated the highest accuracy "
+            f"with a MAPE of {best_model['mape']}%. High forecasting precision directly translates to "
+            "optimized grid stability and reduced operational costs by minimizing emergency power procurement."
+        ) if best_model else "Insufficient data to generate operational insights."
+        
+        body.append(Paragraph(conclusion, st["Normal"]))
+        body.append(Spacer(1, 20))
         body.append(Paragraph(
-            f"Model accuracy today: <b>{accuracy}%</b>. "
-            "Accurate forecasting avoids over-generation and reduces reserve costs. "
-            "Estimated avoided cost: <b>₹2.4L</b> (placeholder — connect agent logs for actuals).",
-            st["Normal"],
+            "Disclaimer: This report is an automated diagnostic tool for grid officers. "
+            "Please cross-reference with SCADA real-time telemetry before critical switching operations.",
+            ParagraphStyle("disclaimer", parent=st["Normal"], fontSize=8, textColor=colors.grey)
         ))
 
         doc.build(body)
         return True
-    except ImportError:
-        # reportlab not installed — write a plain-text placeholder
-        filepath.write_text(f"[Placeholder] Daily report for {date_str}\nMetrics: {metrics}\nAnomalies: {len(anomalies)}")
+    except Exception as e:
+        print(f"PDF Render Error: {e}")
+        filepath.write_text(f"PDF Generation Failed: {e}")
         return False
 
 
@@ -226,25 +263,85 @@ def generate_report(start: str = None, end: str = None):
         filename = f"daily_report_{now.strftime('%Y-%m-%d_%H-%M-%S')}.pdf"
 
     filepath = REPORTS_DIR / filename
-    metrics  = _compute_metrics(df)
+    
+    # ── Compute metrics for ALL loaded models ──
+    models = get_model_registry()
+    model_results = []
+    
+    # If df is large, we might want to sample it or optimize this
+    # For daily reports (24 rows), it's negligible.
+    
+    for m in models:
+        if not m["loaded"]:
+            continue
+            
+        m_preds = []
+        for _, row in df.iterrows():
+            ts = pd.to_datetime(row["timestamp"])
+            # predict_hourly uses cache, so this is fast
+            _, p50, _ = predict_hourly(m["key"], ts.hour, ts.weekday())
+            m_preds.append(p50)
+            
+        m_df = df.copy()
+        m_df["predicted_p50"] = m_preds
+        met = _compute_metrics(m_df)
+        
+        model_results.append({
+            "name": m["name"],
+            "mae":  met["mae"],
+            "rmse": met["rmse"],
+            "mape": met["mape"],
+            "key":  m["key"]
+        })
+
     anomalies = _detect_anomalies(df)
-    _render_pdf(title, subtitle, metrics, anomalies, filepath)
+    _render_pdf(title, subtitle, model_results, anomalies, filepath)
     
     return {
         "status": "generated", 
         "id": filepath.name, 
         "title": title,
-        "metrics": metrics
+        "models_evaluated": len(model_results)
     }
+
 
 
 @router.get("/today-summary")
 def today_summary():
     """Quick preview card — uses the latest 24h of data."""
-    df        = _load_range()
-    metrics   = _compute_metrics(df)
+    df = _load_range()
+    if df.empty:
+        return {
+            "date": "No Data",
+            "accuracy": 0,
+            "anomalies": 0,
+            "savings": "₹0.0L",
+            "hours_done": 0,
+            "hours_total": 24,
+            "best_model": "None"
+        }
+    
+    models = get_model_registry()
+    best_mape = 100.0
+    best_model_name = "Synthetic"
+    
+    for m in models:
+        if not m["loaded"]: continue
+        m_preds = []
+        for _, row in df.iterrows():
+            ts = pd.to_datetime(row["timestamp"])
+            _, p50, _ = predict_hourly(m["key"], ts.hour, ts.weekday())
+            m_preds.append(p50)
+        
+        m_df = df.copy()
+        m_df["predicted_p50"] = m_preds
+        met = _compute_metrics(m_df)
+        if met["mape"] < best_mape:
+            best_mape = met["mape"]
+            best_model_name = m["name"]
+    
     anomalies = _detect_anomalies(df)
-    accuracy  = round(100 - metrics["mape"], 1)
+    accuracy = round(100 - best_mape, 1)
     hours_done = len(df)
     
     # Get the date from the DB
@@ -261,7 +358,9 @@ def today_summary():
         "savings":    "₹2.4L",
         "hours_done": hours_done,
         "hours_total": 24,
+        "best_model": best_model_name
     }
+
 
 
 @router.get("/{report_id}/download")

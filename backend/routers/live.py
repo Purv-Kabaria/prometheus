@@ -47,11 +47,16 @@ def _make_summary(history: pd.DataFrame) -> dict:
 
 # ── endpoint ──────────────────────────────────────────────────────────────────
 
+from .model_inference import predict_hourly, get_model_registry
+
 @router.get("")
-def get_live_comparison(hours: int = Query(default=24, ge=1, le=168)):
+def get_live_comparison(
+    hours: int = Query(default=24, ge=1, le=168),
+    model: str = Query(default="default")
+):
     """
     Returns hourly actual vs P10/P50/P90 predicted consumption.
-    Auto-backfills from the Adani dataset when the store is sparse.
+    If a specific model is requested, predictions are recalculated on-the-fly.
     """
     history = get_recent_history(hours)
 
@@ -59,5 +64,21 @@ def get_live_comparison(hours: int = Query(default=24, ge=1, le=168)):
         _backfill(max(hours, 168))            # seed at least a week
         history = get_recent_history(hours)
 
+    # If a specific model is requested, override predicted_p50
+    if model != "default":
+        for idx, row in history.iterrows():
+            ts = pd.to_datetime(row["timestamp"])
+            p10, p50, p90 = predict_hourly(model, ts.hour, ts.weekday())
+            history.at[idx, "predicted_p50"] = p50
+            history.at[idx, "predicted_p10"] = p10
+            history.at[idx, "predicted_p90"] = p90
+            
+            # Recalculate residual and deviation
+            actual = row["actual"]
+            if actual is not None and actual > 0:
+                history.at[idx, "residual"] = actual - p50
+                history.at[idx, "deviation_pct"] = (abs(actual - p50) / actual) * 100
+
     records = history.replace({np.nan: None}).to_dict(orient="records")
     return {"data": records, "summary": _make_summary(history)}
+

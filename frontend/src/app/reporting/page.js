@@ -10,6 +10,42 @@ import Card from "@/components/Card";
 
 const API = "http://localhost:8000";
 
+// ─── Model Selector Component ───────────────────────────────────────────────────
+function ModelSelector({ models, activeModel, onChange, loading }) {
+  if (!models || models.length === 0) return null;
+  const options = [{ key: "default", name: "System Default (Ensemble)" }, ...models];
+  
+  return (
+    <div style={{ marginBottom: "32px", maxWidth: "480px" }}>
+      <div style={{ fontSize: "10px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+        Forecast Model Evaluation
+      </div>
+      <div style={{ position: "relative" }}>
+        <select
+          value={activeModel}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={loading}
+          style={{
+            width: "100%", padding: "14px 20px", borderRadius: "10px",
+            background: "var(--surface)", border: "1px solid var(--surface-border)",
+            color: "var(--foreground)", fontSize: "14px", fontWeight: "600",
+            outline: "none", cursor: loading ? "not-allowed" : "pointer",
+            appearance: "none",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.02)"
+          }}
+        >
+          {options.map(m => (
+            <option key={m.key} value={m.key} disabled={m.key !== "default" && !m.loaded}>
+              {m.name} {!m.loaded && m.key !== "default" ? "(Syncing...)" : ""}
+            </option>
+          ))}
+        </select>
+        <div style={{ position: "absolute", right: "16px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--muted)", fontSize: "10px" }}>▼</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (v) => v == null ? "" : Number(v) >= 1000 ? `${(Number(v)/1000).toFixed(1)}k` : Number(v).toFixed(1);
 
@@ -100,16 +136,29 @@ export default function ReportingPage() {
   const [freq, setFreq] = useState("W"); // H, D, W
   const [historyData, setHistoryData] = useState([]);
 
+  // Model State
+  const [activeModel, setActiveModel] = useState("default");
+  const [models, setModels] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API}/api/forecast/models`)
+      .then(r => r.json())
+      .then(d => setModels(d.models || []))
+      .catch(() => {});
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    console.log(`[Reporting] Fetching data for view=${viewMode}, model=${activeModel}, freq=${freq}`);
     try {
       if (viewMode === "live") {
         const [liveRes, perfRes, repsRes, sumRes] = await Promise.all([
-          fetch(`${API}/api/live-comparison?hours=${hours}`),
-          fetch(`${API}/api/model/performance`),
+          fetch(`${API}/api/live-comparison?hours=${hours}&model=${activeModel}`),
+          fetch(`${API}/api/model/performance?model=${activeModel}`),
           fetch(`${API}/api/reports`),
           fetch(`${API}/api/reports/today-summary`),
         ]);
+
         const [live, perfData, reps, sum] = await Promise.all([
           liveRes.json(), perfRes.json(), repsRes.json(), sumRes.json(),
         ]);
@@ -118,17 +167,21 @@ export default function ReportingPage() {
         setPerf(perfData);
         setReports(reps || []);
         setTodaySummary(sum);
+        // Clear history data to avoid stale chart if user switches
+        setHistoryData([]);
       } else {
-        const res = await fetch(`${API}/api/grid-history?freq=${freq}&limit=2000`);
+        const res = await fetch(`${API}/api/grid-history?freq=${freq}&limit=2000&model=${activeModel}`);
         const data = await res.json();
         setHistoryData(data.data || []);
+        // Clear live data
+        setLiveData([]);
       }
     } catch (e) {
       console.error("Fetch failed", e);
     } finally {
       setLoading(false);
     }
-  }, [hours, viewMode, freq]);
+  }, [hours, viewMode, freq, activeModel]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -206,6 +259,14 @@ export default function ReportingPage() {
         </button>
       </div>
 
+      {/* Model Selection */}
+      <ModelSelector 
+        models={models} 
+        activeModel={activeModel} 
+        onChange={setActiveModel} 
+        loading={loading} 
+      />
+
       {/* Metrics Row (Only in Live Mode) */}
       {viewMode === "live" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px", marginBottom: "48px" }}>
@@ -254,8 +315,8 @@ export default function ReportingPage() {
             <ComposedChart data={viewMode === "live" ? liveData : historyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="var(--primary)" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                  <stop offset="5%"  stopColor="var(--success)" stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor="var(--success)" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--surface-border)" />
@@ -274,8 +335,9 @@ export default function ReportingPage() {
               <Tooltip content={<CustomTooltip />} />
               <Legend verticalAlign="top" height={40} align="right" iconType="circle" />
               
-              <Area type="monotone" dataKey="actual" stroke="var(--primary)" strokeWidth={2} fill="url(#gradActual)" name="Actual demand" dot={false} />
-              <Line type="monotone" dataKey="predicted_p50" stroke="var(--warning)" strokeWidth={1.5} strokeDasharray="4 4" dot={false} name="Model prediction" />
+              <Area type="monotone" dataKey="actual" stroke="var(--success)" strokeWidth={2} fill="url(#gradActual)" name="Actual demand" dot={false} />
+              <Line type="monotone" dataKey="predicted_p50" stroke="var(--warning)" strokeWidth={2} strokeDasharray="4 4" dot={false} name={`${activeModel === "default" ? "System" : activeModel} prediction`} />
+
             </ComposedChart>
           </ResponsiveContainer>
         </div>
