@@ -5,6 +5,38 @@
     "target_mwh": 792.5,
     "target_hour": "14:00",
     "rationale": "[MCP Agent Decision] Forecast analysis complete. Predicted average demand is 4207 MW over the next 6 hours, while committed generation is 5000 MW. I utilized MCP tools to analyze this anomaly. I recommend curtailing 792.5 MW to prevent over-generation.",
+    "status": "accepted"
+  },
+  {
+    "id": "maint_7105",
+    "action_type": "maintenance",
+    "equipment_id": "ID123",
+    "start_time": "now",
+    "end_time": "now",
+    "status": "pending_approval"
+  },
+  {
+    "id": "maint_5399",
+    "action_type": "maintenance",
+    "equipment_id": "gen-01",
+    "start_time": "23:00",
+    "end_time": "03:00",
+    "status": "pending_approval"
+  },
+  {
+    "id": "maint_2972",
+    "action_type": "maintenance",
+    "equipment_id": "[Provide specific Equipment ID]",
+    "start_time": "12",
+    "end_time": "13",
+    "status": "pending_approval"
+  },
+  {
+    "id": "maint_2004",
+    "action_type": "maintenance",
+    "equipment_id": "E001",
+    "start_time": "13:00",
+    "end_time": "14:00",
     "status": "pending_approval"
   }
 ]

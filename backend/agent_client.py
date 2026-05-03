@@ -16,7 +16,7 @@ def mcp_tool_to_ollama(tool):
         }
     }
 
-async def run_mcp_agent_workflow():
+async def run_mcp_agent_workflow(user_prompt: str = None):
     """
     Full Agentic Loop using Ollama as the brain and MCP as the tool provider.
     """
@@ -27,7 +27,6 @@ async def run_mcp_agent_workflow():
         args=[server_script]
     )
 
-    # Use environment variable for Docker compatibility, default to localhost
     ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
     # Fast check if Ollama daemon is running
@@ -39,6 +38,9 @@ async def run_mcp_agent_workflow():
         return {"status": "error", "message": f"Ollama server is not responding at {ollama_host}. If running via Docker, it may still be downloading the llama3 model."}
 
     ollama_client = AsyncClient(host=ollama_host)
+    
+    # Use the custom prompt if provided, otherwise default
+    final_prompt = user_prompt if user_prompt else "Please analyze the grid state for the next 6 hours and propose any necessary actions."
 
     try:
         async with stdio_client(server_params) as (read, write):
@@ -53,25 +55,28 @@ async def run_mcp_agent_workflow():
                         "role": "system",
                         "content": (
                             "You are the Prometheus Grid Agent, an advanced AI assisting grid operations officers. "
-                            "You have access to tools to fetch demand forecasts and committed generation. "
-                            "First, gather the committed generation and the demand forecast for the next 6 hours. "
-                            "If the generation is significantly higher than the average demand forecast (by >300 MW), "
-                            "you MUST use the propose_grid_action tool to propose a 'curtailment' action to save costs. "
+                            "You have access to tools to fetch demand forecasts, check committed generation, and schedule maintenance. "
+                            "Follow the user's specific prompt. Use tools to gather data if necessary. "
+                            "If you determine an action is needed based on the user's request (like a curtailment), use the propose_grid_action tool. "
                             "Provide a clear rationale. Do NOT ask the user for permission to call tools, just execute them."
                         )
                     },
                     {
                         "role": "user",
-                        "content": "Please analyze the grid state for the next 6 hours and propose any necessary actions."
+                        "content": final_prompt
                     }
                 ]
                 
                 print(f"[Agent] Connecting to Ollama at {ollama_host}...")
-                response = await ollama_client.chat(
-                    model='llama3',
-                    messages=messages,
-                    tools=ollama_tools
-                )
+                try:
+                    response = await ollama_client.chat(
+                        model='qwen2.5:3b',
+                        messages=messages,
+                        tools=ollama_tools
+                    )
+                except Exception as ollama_err:
+                    print(f"[Agent] Ollama Error: {ollama_err}")
+                    return {"status": "error", "message": f"Ollama Error: {str(ollama_err)}. If running via Docker, it may still be downloading the model."}
                 
                 messages.append(response['message'])
                 
@@ -102,11 +107,16 @@ async def run_mcp_agent_workflow():
                         })
                     
                     print("[Agent] Sending tool results back to Ollama...")
-                    response = await ollama_client.chat(
-                        model='llama3',
-                        messages=messages,
-                        tools=ollama_tools
-                    )
+                    try:
+                        response = await ollama_client.chat(
+                            model='qwen2.5:3b',
+                            messages=messages,
+                            tools=ollama_tools
+                        )
+                    except Exception as ollama_err:
+                        print(f"[Agent] Ollama Error: {ollama_err}")
+                        return {"status": "error", "message": f"Ollama Error during tool loop: {str(ollama_err)}"}
+                        
                     messages.append(response['message'])
 
                 print("[Agent] Workflow complete.")
@@ -117,5 +127,7 @@ async def run_mcp_agent_workflow():
                 }
 
     except Exception as e:
-        print(f"[Agent] Error: {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[Agent] Full Error Traceback:\n{tb}")
         return {"status": "error", "message": f"Agent workflow failed: {str(e)}"}

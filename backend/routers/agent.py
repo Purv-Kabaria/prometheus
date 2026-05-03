@@ -16,14 +16,18 @@ class FeedbackRequest(BaseModel):
     reason: Optional[str] = None
     overridden_mwh: Optional[float] = None
 
+class TriggerRequest(BaseModel):
+    prompt: Optional[str] = None
+
 @router.post("/trigger")
-async def trigger_agent():
+async def trigger_agent(req: TriggerRequest = None):
     """
     Triggers the full MCP Agent workflow.
     The client spins up the MCP server via stdio, fetches data using tools,
-    makes a decision, and uses tools to propose the action.
+    makes a decision based on the optional user prompt, and uses tools to propose the action.
     """
-    result = await run_mcp_agent_workflow()
+    prompt = req.prompt if req else None
+    result = await run_mcp_agent_workflow(prompt)
     return {"status": "success", "message": "Agent triggered via MCP Protocol.", "details": result}
 
 @router.get("/proposals")

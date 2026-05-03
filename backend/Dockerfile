@@ -4,10 +4,10 @@ WORKDIR /app
 
 # Install standard dependencies if they exist
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt || true
+RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt || true
 
 # Install specific dependencies required for the agent and MCP
-RUN pip install --no-cache-dir mcp ollama fastapi uvicorn pydantic
+RUN pip install --default-timeout=100 --no-cache-dir mcp ollama fastapi uvicorn pydantic
 
 # Copy the backend code
 COPY . .
