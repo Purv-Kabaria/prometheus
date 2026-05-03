@@ -2,12 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install standard dependencies if they exist
-COPY requirements.txt ./
-RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt || true
+# Layer 1: Core data science & API packages (always required, always installed)
+RUN pip install --default-timeout=100 --no-cache-dir \
+    numpy pandas scipy scikit-learn \
+    lightgbm xgboost \
+    statsmodels pmdarima \
+    fastapi uvicorn pydantic \
+    mcp ollama
 
-# Install specific dependencies required for the agent and MCP
-RUN pip install --default-timeout=100 --no-cache-dir mcp ollama fastapi uvicorn pydantic
+# Layer 2: Optional heavy ML packages (torch etc) — failure is acceptable, model falls back to synthetic
+COPY requirements.txt ./
+RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt || echo "Some optional packages failed — continuing with fallback mode."
 
 # Copy the backend code
 COPY . .

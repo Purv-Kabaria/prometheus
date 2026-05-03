@@ -11,6 +11,9 @@ export default function GridOfficerDashboard() {
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalState, setModalState] = useState({ isOpen: false, proposal: null, mode: null });
+  const [userPrompt, setUserPrompt] = useState('');
+  const [agentResponse, setAgentResponse] = useState(null);
+  const [telemetry, setTelemetry] = useState({ demand: null, generation: null });
 
   const fetchProposals = async () => {
     try {
@@ -22,16 +25,44 @@ export default function GridOfficerDashboard() {
     }
   };
 
-  // Fetch proposals on initial load
+  const fetchTelemetry = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/forecast/24h');
+      const data = await res.json();
+      const currentHour = new Date().getHours();
+      const currentSlot = data.slots?.[currentHour];
+      const peakMw = data.summary?.peak_mw;
+      if (currentSlot) {
+        setTelemetry({
+          demand: currentSlot.p50,
+          generation: peakMw ? Math.round(peakMw * 1.10) : null
+        });
+      }
+    } catch (err) { /* silently fail */ }
+  };
+
   useEffect(() => {
     fetchProposals();
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 60000); // refresh every minute
+    return () => clearInterval(interval);
   }, []);
 
   const triggerAgent = async () => {
     setLoading(true);
+    setAgentResponse(null);
     try {
-      await fetch(`${API_BASE}/trigger`, { method: 'POST' });
-      await fetchProposals(); // Refresh to show the new proposal
+      const body = userPrompt.trim() ? { prompt: userPrompt.trim() } : {};
+      const res = await fetch(`${API_BASE}/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.details?.final_response) {
+        setAgentResponse(data.details.final_response);
+      }
+      await fetchProposals();
     } catch (err) {
       console.error("Failed to trigger agent:", err);
       alert("Failed to connect to backend. Make sure FastAPI is running on port 8000.");
@@ -81,9 +112,38 @@ export default function GridOfficerDashboard() {
           {loading ? (
             <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
           ) : null}
-          {loading ? 'Simulating...' : 'Trigger Agent Simulation'}
+          {loading ? 'Analyzing...' : 'Run Agent'}
         </button>
       </header>
+
+      {/* Prompt input bar */}
+      <div className="max-w-5xl mx-auto mb-6 flex gap-3">
+        <input
+          type="text"
+          value={userPrompt}
+          onChange={e => setUserPrompt(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !loading && triggerAgent()}
+          placeholder="Ask the agent... e.g. 'Check if we need maintenance this week' or leave blank for full grid analysis"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+        <button onClick={triggerAgent} disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50">
+          {loading ? '...' : 'Ask'}
+        </button>
+      </div>
+
+      {/* Agent response panel */}
+      {agentResponse && (
+        <div className="max-w-5xl mx-auto mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-5">
+          <div className="flex gap-3">
+            <span className="text-indigo-600 text-xl">🤖</span>
+            <div>
+              <p className="text-xs font-semibold text-indigo-600 mb-1">AGENT ANALYSIS</p>
+              <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{agentResponse}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         
@@ -138,28 +198,36 @@ export default function GridOfficerDashboard() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-600">Committed Generation</span>
-                  <span className="font-medium">5,000 MW</span>
+                  <span className="font-medium">{telemetry.generation ? `${telemetry.generation.toLocaleString()} MW` : '—'}</span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5"><div className="bg-blue-500 h-1.5 rounded-full w-4/5"></div></div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-blue-500 h-1.5 rounded-full" style={{width: telemetry.generation ? `${Math.min((telemetry.generation/6000)*100, 100)}%` : '80%'}}></div>
+                </div>
               </div>
               
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Current Demand</span>
-                  <span className="font-medium text-green-600">4,200 MW</span>
+                  <span className="text-gray-600">Forecast Demand (now)</span>
+                  <span className={`font-medium ${telemetry.demand > 12000 ? 'text-red-600' : 'text-green-600'}`}>
+                    {telemetry.demand ? `${telemetry.demand.toLocaleString()} MW` : '—'}
+                  </span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-1.5"><div className="bg-green-500 h-1.5 rounded-full w-3/4"></div></div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-green-500 h-1.5 rounded-full" style={{width: telemetry.demand ? `${Math.min((telemetry.demand/15000)*100, 100)}%` : '75%'}}></div>
+                </div>
               </div>
             </div>
             
-            <div className="mt-5 p-3 bg-amber-50 rounded border border-amber-100">
-              <div className="flex gap-2">
-                <span className="text-amber-500">⚠️</span>
-                <p className="text-xs text-amber-800 leading-tight">
-                  <span className="font-semibold">Over-generation warning:</span> Forecast suggests demand will drop further due to high solar output.
-                </p>
+            {telemetry.generation && telemetry.demand && telemetry.generation > telemetry.demand * 1.15 && (
+              <div className="mt-5 p-3 bg-amber-50 rounded border border-amber-100">
+                <div className="flex gap-2">
+                  <span className="text-amber-500">⚠️</span>
+                  <p className="text-xs text-amber-800 leading-tight">
+                    <span className="font-semibold">Over-generation warning:</span> Committed generation exceeds forecast demand by &gt;15%.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* New Operational Intelligence Card */}

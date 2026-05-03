@@ -62,6 +62,101 @@ def get_committed_generation() -> str:
         return json.dumps({"status": "fallback", "generation_mwh": 5000, "unit": "MW", "error": str(e)})
 
 @mcp.tool()
+def get_grid_equipment() -> str:
+    """Get all active grid equipment with maintenance status and overdue flags."""
+    from datetime import datetime
+
+    today = datetime.now().date()
+    equipment = [
+        {"id": "GEN-01", "type": "Coal Power Plant",           "capacity_mw": 1200, "maintenance_interval_days": 90,  "last_maintained": "2026-02-01"},
+        {"id": "GEN-02", "type": "Solar Farm",                 "capacity_mw": 800,  "maintenance_interval_days": 180, "last_maintained": "2026-04-01"},
+        {"id": "GEN-03", "type": "Wind Farm",                  "capacity_mw": 450,  "maintenance_interval_days": 60,  "last_maintained": "2026-03-20"},
+        {"id": "TRF-A1", "type": "Main Substation Transformer","capacity_mw": 2000, "maintenance_interval_days": 365, "last_maintained": "2025-12-01"},
+        {"id": "BATT-01","type": "Grid Battery Storage",       "capacity_mw": 150,  "maintenance_interval_days": 120, "last_maintained": "2026-01-15"},
+    ]
+    for eq in equipment:
+        from datetime import datetime as dt
+        last = dt.strptime(eq["last_maintained"], "%Y-%m-%d").date()
+        days_since = (today - last).days
+        eq["days_since_last_maintenance"] = days_since
+        eq["overdue"] = days_since > eq["maintenance_interval_days"]
+        eq["status"] = "needs_maintenance" if eq["overdue"] else "active"
+    return json.dumps({"status": "success", "equipment": equipment})
+
+@mcp.tool()
+def find_optimal_maintenance_window(equipment_id: str, duration_hours: int = 4) -> str:
+    """
+    Analyzes the real 24-hour demand forecast to find the safest time window
+    to take a specific piece of equipment offline for maintenance.
+    Returns the top 3 windows ranked by lowest demand with grid safety checks.
+    """
+    try:
+        from datetime import datetime, timedelta
+
+        EQUIPMENT_REGISTRY = {
+            "GEN-01": {"capacity_mw": 1200, "type": "Coal Power Plant"},
+            "GEN-02": {"capacity_mw": 800,  "type": "Solar Farm"},
+            "GEN-03": {"capacity_mw": 450,  "type": "Wind Farm"},
+            "TRF-A1": {"capacity_mw": 2000, "type": "Main Substation Transformer"},
+            "BATT-01": {"capacity_mw": 150,  "type": "Grid Battery Storage"},
+        }
+
+        if equipment_id not in EQUIPMENT_REGISTRY:
+            return json.dumps({"status": "error", "message": f"Unknown equipment ID: {equipment_id}. Call get_grid_equipment first."})
+
+        eq = EQUIPMENT_REGISTRY[equipment_id]
+        total_capacity = sum(e["capacity_mw"] for e in EQUIPMENT_REGISTRY.values())
+        # Available capacity with this unit offline
+        remaining_capacity = total_capacity - eq["capacity_mw"]
+
+        # Use real forecast to evaluate every possible window
+        forecast_data = forecast_24h(state="Maharashtra", model="tcn_xgb")
+        slots = forecast_data.get("slots", [])
+
+        base_time = datetime.now().replace(minute=0, second=0, microsecond=0)
+        windows = []
+
+        for start_idx in range(len(slots) - duration_hours + 1):
+            window_slots = slots[start_idx:start_idx + duration_hours]
+            peak_demand   = max(s["p50"] for s in window_slots)
+            avg_demand    = sum(s["p50"] for s in window_slots) / len(window_slots)
+            safety_buffer = remaining_capacity - peak_demand  # positive = safe
+
+            start_dt = base_time + timedelta(hours=start_idx)
+            end_dt   = start_dt + timedelta(hours=duration_hours)
+
+            windows.append({
+                "start_time":      start_dt.strftime("%Y-%m-%d %H:%M"),
+                "end_time":        end_dt.strftime("%Y-%m-%d %H:%M"),
+                "avg_demand_mw":   round(avg_demand, 1),
+                "peak_demand_mw":  round(peak_demand, 1),
+                "safety_buffer_mw": round(safety_buffer, 1),
+                "is_safe":         safety_buffer > 200,  # require 200MW headroom minimum
+            })
+
+        safe_windows = sorted(
+            [w for w in windows if w["is_safe"]],
+            key=lambda x: x["avg_demand_mw"]  # lowest demand first = least disruption
+        )
+
+        return json.dumps({
+            "status": "success",
+            "equipment_id":               equipment_id,
+            "equipment_type":             eq["type"],
+            "capacity_taken_offline_mw":  eq["capacity_mw"],
+            "remaining_grid_capacity_mw": remaining_capacity,
+            "duration_hours":             duration_hours,
+            "recommended_windows":        safe_windows[:3],
+            "total_safe_windows_found":   len(safe_windows),
+            "note": "Windows ranked by lowest average demand. Use top window's start_time and end_time in schedule_maintenance."
+        })
+
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+
+@mcp.tool()
 def propose_grid_action(action_type: str, target_mwh: float, target_hour: str, rationale: str) -> str:
     """
     Propose a grid action (like curtailment or reserve deployment) to the grid officer.
@@ -87,8 +182,8 @@ def propose_grid_action(action_type: str, target_mwh: float, target_hour: str, r
     })
 
 @mcp.tool()
-def schedule_maintenance(equipment_id: str, start_time: str, end_time: str) -> str:
-    """Propose a maintenance schedule for grid equipment during predicted low-demand windows."""
+def schedule_maintenance(equipment_id: str, start_time: str, end_time: str, rationale: str = "") -> str:
+    """Propose a maintenance schedule for grid equipment during predicted low-demand windows. Always use the window from find_optimal_maintenance_window."""
     proposal_id = f"maint_{random.randint(1000, 9999)}"
     proposal = {
         "id": proposal_id,
@@ -96,6 +191,7 @@ def schedule_maintenance(equipment_id: str, start_time: str, end_time: str) -> s
         "equipment_id": equipment_id,
         "start_time": start_time,
         "end_time": end_time,
+        "rationale": rationale if rationale else f"Maintenance scheduled for {equipment_id} during a forecast low-demand window ({start_time} – {end_time}) to minimize grid disruption.",
         "status": "pending_approval"
     }
     add_proposal(proposal)

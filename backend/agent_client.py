@@ -66,10 +66,14 @@ async def run_mcp_agent_workflow(user_prompt: str = None):
                         "role": "system",
                         "content": (
                             "You are the Prometheus Grid Agent, an advanced AI assisting grid operations officers. "
-                            "You have access to tools to fetch demand forecasts, check committed generation, and schedule maintenance. "
-                            "Follow the user's specific prompt. Use tools to gather data if necessary. "
-                            "If you determine an action is needed based on the user's request (like a curtailment), use the propose_grid_action tool. "
-                            "Provide a clear rationale. Do NOT ask the user for permission to call tools, just execute them."
+                            "You have access to tools to fetch demand forecasts, check committed generation, inspect grid equipment, find maintenance windows, and schedule maintenance. "
+                            "Follow the user's specific prompt. Use tools to gather data before forming conclusions. "
+                            "MAINTENANCE WORKFLOW (always follow these steps in order): "
+                            "1. Call get_grid_equipment() to identify equipment that is overdue for maintenance. "
+                            "2. Call find_optimal_maintenance_window(equipment_id) for each overdue unit to find the safest low-demand window. "
+                            "3. Call schedule_maintenance() using the top recommended window's exact start_time and end_time. "
+                            "For curtailment decisions, call get_demand_forecast() and get_committed_generation() first, then use propose_grid_action(). "
+                            "Provide clear rationale for every decision. Do NOT ask the user for permission to call tools, just execute them."
                         )
                     },
                     {
@@ -91,7 +95,10 @@ async def run_mcp_agent_workflow(user_prompt: str = None):
                 
                 messages.append(response['message'])
                 
-                while response.get('message', {}).get('tool_calls'):
+                max_iterations = 8  # guard against infinite tool-call loops
+                iteration = 0
+                while response.get('message', {}).get('tool_calls') and iteration < max_iterations:
+                    iteration += 1
                     tool_calls = response['message']['tool_calls']
                     
                     for tool_call in tool_calls:
