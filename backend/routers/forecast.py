@@ -110,7 +110,7 @@ def forecast_24h(
     trough_slot = min(slots, key=lambda s: s["p50"])
     avg_conf    = round(sum(s["confidence"] for s in slots) / len(slots) * 100, 1)
 
-    return {
+    res = {
         "model":         model,
         "generated_at":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "horizon_hours": 24,
@@ -124,6 +124,10 @@ def forecast_24h(
             "avg_confidence": avg_conf,
         },
     }
+    if model != "all" and MODEL_STATUS.get(model, {}).get("error"):
+        res["fallback"] = True
+        res["error"] = MODEL_STATUS[model]["error"]
+    return res
 
 
 # ── 7-day weekly forecast ────────────────────────────────────────────────────
@@ -185,7 +189,7 @@ def forecast_7day(
 
     best_maint = max(days, key=lambda d: d["maintenance_score"])
 
-    return {
+    res = {
         "model":         model,
         "generated_at":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "horizon_days":  7,
@@ -197,6 +201,10 @@ def forecast_7day(
             "max_units_needed":      max(d["units_needed"] for d in days),
         },
     }
+    if model != "all" and MODEL_STATUS.get(model, {}).get("error"):
+        res["fallback"] = True
+        res["error"] = MODEL_STATUS[model]["error"]
+    return res
 
 
 # ── 30-day monthly forecast ──────────────────────────────────────────────────
@@ -259,7 +267,7 @@ def forecast_30day(
 
     best_maint = max(days, key=lambda d: d["maintenance_score"])
 
-    return {
+    res = {
         "state":         state,
         "model":         model,
         "generated_at":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -272,6 +280,10 @@ def forecast_30day(
             "max_units_needed":      max(d["units_needed"] for d in days),
         },
     }
+    if model != "all" and MODEL_STATUS.get(model, {}).get("error"):
+        res["fallback"] = True
+        res["error"] = MODEL_STATUS[model]["error"]
+    return res
 
 
 
