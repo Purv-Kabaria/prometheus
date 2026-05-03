@@ -3,6 +3,9 @@ import React from 'react';
 export default function ProposalCard({ proposal, onAccept, onReject, onOverride }) {
   if (!proposal) return null;
   
+  const isMaintenance = proposal.action_type === 'maintenance';
+  const isPending = proposal.status === 'pending_approval';
+
   return (
     <div style={{
       background: "var(--surface)",
@@ -13,7 +16,17 @@ export default function ProposalCard({ proposal, onAccept, onReject, onOverride 
       transition: "all 0.2s ease"
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {proposal.status && !isPending && (
+            <span style={{
+              fontSize: "10px", fontWeight: "700", padding: "3px 10px",
+              borderRadius: "20px", textTransform: "uppercase",
+              background: proposal.status === 'accepted' ? "rgba(39,174,96,0.12)" : "rgba(192,57,43,0.1)",
+              color: proposal.status === 'accepted' ? "var(--success)" : "var(--danger)"
+            }}>
+              {proposal.status}
+            </span>
+          )}
           <div style={{ 
             width: "40px", 
             height: "40px", 
@@ -25,13 +38,15 @@ export default function ProposalCard({ proposal, onAccept, onReject, onOverride 
             color: "var(--primary)",
             fontWeight: "700" 
           }}>
-            A
+            {isMaintenance ? 'M' : 'A'}
           </div>
           <div>
             <h3 className="serif" style={{ fontSize: "16px", fontWeight: "400", margin: 0 }}>
-              Agent Proposal: {proposal.action_type.toUpperCase()}
+              {isMaintenance ? 'Maintenance Schedule' : `Agent Proposal: ${proposal.action_type.toUpperCase()}`}
             </h3>
-            <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "500" }}>ID: {proposal.id}</span>
+            <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "500" }}>
+              ID: {proposal.id} {isMaintenance && `· Unit: ${proposal.equipment_id}`}
+            </span>
           </div>
         </div>
         <span style={{ 
@@ -43,7 +58,7 @@ export default function ProposalCard({ proposal, onAccept, onReject, onOverride 
           borderRadius: "20px",
           border: "1px solid var(--surface-border)"
         }}>
-          92% Confidence
+          {proposal.confidence != null ? `${proposal.confidence}% Confidence` : 'High Confidence'}
         </span>
       </div>
       
@@ -56,34 +71,41 @@ export default function ProposalCard({ proposal, onAccept, onReject, onOverride 
       }}>
         <p style={{ fontSize: "14px", color: "var(--foreground)", lineHeight: "1.6", margin: 0 }}>
           <strong style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>Rationale:</strong><br />
-          {proposal.rationale}
+          {proposal.rationale || "No detailed rationale provided by agent."}
         </p>
       </div>
       
-      <div style={{ display: "flex", alignItems: "center", justifySpaceBetween: "space-between", marginTop: "12px", paddingTop: "20px", borderTop: "1px solid var(--surface-border)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "12px", paddingTop: "20px", borderTop: "1px solid var(--surface-border)" }}>
         <div style={{ fontSize: "13px", fontWeight: "600", color: "var(--primary)", background: "var(--accent)", padding: "8px 16px", borderRadius: "6px" }}>
-          Target: {proposal.target_mwh} MWh @ {proposal.target_hour}
+          {isMaintenance ? (
+            <span>Window: {proposal.start_time} – {proposal.end_time}</span>
+          ) : (
+            <span>Target: {proposal.target_mwh} MWh @ {proposal.target_hour}</span>
+          )}
         </div>
-        <div style={{ display: "flex", gap: "12px", marginLeft: "auto" }}>
-          <button 
-            onClick={() => onReject(proposal)}
-            style={{ fontSize: "13px", fontWeight: "600", color: "var(--danger)", padding: "8px 16px" }}
-          >
-            Reject
-          </button>
-          <button 
-            onClick={() => onOverride(proposal)}
-            style={{ fontSize: "13px", fontWeight: "600", color: "var(--muted)", padding: "8px 16px" }}
-          >
-            Override
-          </button>
-          <button 
-            onClick={() => onAccept(proposal)}
-            style={{ background: "var(--primary)", color: "white", padding: "8px 24px", borderRadius: "8px", fontSize: "13px", fontWeight: "600" }}
-          >
-            Accept Proposal
-          </button>
-        </div>
+        
+        {isPending && (
+          <div style={{ display: "flex", gap: "12px", marginLeft: "auto" }}>
+            <button 
+              onClick={() => onReject(proposal)}
+              style={{ fontSize: "13px", fontWeight: "600", color: "var(--danger)", padding: "8px 16px" }}
+            >
+              Reject
+            </button>
+            <button 
+              onClick={() => onOverride(proposal)}
+              style={{ fontSize: "13px", fontWeight: "600", color: "var(--muted)", padding: "8px 16px" }}
+            >
+              Override
+            </button>
+            <button 
+              onClick={() => onAccept(proposal)}
+              style={{ background: "var(--primary)", color: "white", padding: "8px 24px", borderRadius: "8px", fontSize: "13px", fontWeight: "600" }}
+            >
+              Accept Proposal
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

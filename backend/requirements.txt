@@ -43,3 +43,4 @@ langchain-core>=0.3.0
 # --- Intelligence & Reporting ---
 reportlab
 mcp
+shap>=0.45.0

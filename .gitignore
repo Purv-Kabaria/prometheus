@@ -1,7 +1,14 @@
 venv
 *.pyc
+__pycache__/
 
 final_merged.csv
 all_years.csv
 .env
 *.env
+
+# Runtime-generated state — never commit these
+backend/proposals_db.json
+backend/proposals.db
+backend/data/reports/*.pdf
+backend/data/uploads/
