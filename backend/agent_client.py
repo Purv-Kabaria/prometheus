@@ -49,7 +49,7 @@ async def run_mcp_agent_workflow(user_prompt: str = None):
         check_url = ollama_host if ollama_host.endswith("/") else ollama_host + "/"
         urllib.request.urlopen(check_url, timeout=2)
     except Exception:
-        return {"status": "error", "message": f"Ollama server is not responding at {ollama_host}. If running via Docker, it may still be downloading the llama3 model."}
+        return {"status": "error", "message": f"Ollama server is not responding at {ollama_host}. If running via Docker, it may still be downloading the model."}
 
     ollama_client = _OllamaClient(host=ollama_host)
     

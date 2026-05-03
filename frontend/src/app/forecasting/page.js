@@ -15,6 +15,8 @@ const MODEL_COLORS = {
   synthetic:      { accent: "var(--primary)", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.25)" },
   lgbm:           { accent: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)" },
   tcn_xgb:        { accent: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)" },
+  mamba:          { accent: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.25)" },
+  planner:        { accent: "#f97316", bg: "rgba(249,115,22,0.08)", border: "rgba(249,115,22,0.25)" },
   adani_catboost: { accent: "#ec4899", bg: "rgba(236,72,153,0.08)", border: "rgba(236,72,153,0.25)" },
   adani_lightgbm: { accent: "#06b6d4", bg: "rgba(6,182,212,0.08)", border: "rgba(6,182,212,0.25)" },
   adani_prophet:  { accent: "#f43f5e", bg: "rgba(244,63,94,0.08)", border: "rgba(244,63,94,0.25)" },
@@ -151,6 +153,7 @@ function Forecast24h({ data, models }) {
   if (!data) return <Spinner />;
   const { slots, summary, model } = data;
   const isAll = model === "all";
+  const activeColor = MODEL_COLORS[model]?.accent || "var(--primary)";
 
   const chartData = slots.map(s => {
     const p = {
@@ -184,8 +187,8 @@ function Forecast24h({ data, models }) {
           <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="bandFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="var(--primary)" stopOpacity={0.1} />
-                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                <stop offset="5%"  stopColor={activeColor} stopOpacity={0.1} />
+                <stop offset="95%" stopColor={activeColor} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--surface-border)" />
@@ -196,8 +199,8 @@ function Forecast24h({ data, models }) {
             <ReferenceLine y={16500} stroke="var(--danger)" strokeDasharray="4 2"
               label={{ value: "Grid Capacity", fill: "var(--danger)", fontSize: 10, position: "insideTopRight", fontWeight: "700" }} />
             
-            {!isAll && <Area type="monotone" dataKey="p90" name="P90" stroke="var(--primary)" strokeWidth={1} fill="url(#bandFill)" strokeOpacity={0.2} strokeDasharray="4 2" />}
-            {!isAll && <Area type="monotone" dataKey="p10" name="P10" stroke="var(--primary)" strokeWidth={1} fill="none" strokeOpacity={0.2} strokeDasharray="4 2" />}
+            {!isAll && <Area type="monotone" dataKey="p90" name="P90" stroke={activeColor} strokeWidth={1} fill="url(#bandFill)" strokeOpacity={0.2} strokeDasharray="4 2" />}
+            {!isAll && <Area type="monotone" dataKey="p10" name="P10" stroke={activeColor} strokeWidth={1} fill="none" strokeOpacity={0.2} strokeDasharray="4 2" />}
             
             {isAll ? (
               Object.keys(chartData[0] || {}).filter(k => k.endsWith("_p50")).map((key, i) => {
@@ -209,7 +212,7 @@ function Forecast24h({ data, models }) {
                 return <Area key={key} type="monotone" dataKey={key} name={displayName} stroke={color} strokeWidth={2} fill="none" dot={false} />;
               })
             ) : (
-              <Area type="monotone" dataKey="p50" name="P50 (median)" stroke="var(--primary)" strokeWidth={2.5} fill="none" dot={false} />
+              <Area type="monotone" dataKey="p50" name="P50 (median)" stroke={activeColor} strokeWidth={2.5} fill="none" dot={false} />
             )}
           </AreaChart>
         </ResponsiveContainer>
@@ -234,7 +237,7 @@ function Forecast24h({ data, models }) {
                 <td style={{ padding: "12px 10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <div style={{ width: "60px", height: "4px", background: "var(--surface-border)", borderRadius: "2px", overflow: "hidden" }}>
-                      <div style={{ width: `${s.confidence * 100}%`, height: "100%", background: "var(--primary)", opacity: 0.8 }} />
+                      <div style={{ width: `${s.confidence * 100}%`, height: "100%", background: isAll ? "var(--primary)" : activeColor, opacity: 0.8 }} />
                     </div>
                     <span style={{ color: "var(--muted)", fontSize: "10px" }}>{(s.confidence * 100).toFixed(0)}%</span>
                   </div>
@@ -719,7 +722,7 @@ export default function ForecastingPage() {
         {tab === "explain" && <XAIExplainPanel activeModel={activeModel} />}
       </Panel>
       
-      <style jsx>{`
+      <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
         }

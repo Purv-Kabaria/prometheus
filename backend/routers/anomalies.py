@@ -62,7 +62,7 @@ def explain(anomaly_id: str):
         logger.exception("Explain failed")
         raise HTTPException(
             status_code=503,
-            detail=f"LLM unavailable: {exc}. Ensure Ollama is running with llama3.",
+            detail=f"LLM unavailable: {exc}.",
         ) from exc
     update_record(
         anomaly_id,
@@ -88,7 +88,7 @@ def chat_anomaly(anomaly_id: str, body: ChatBody):
         logger.exception("Chat failed")
         raise HTTPException(
             status_code=503,
-            detail=f"LLM unavailable: {exc}. Ensure Ollama is running with llama3.",
+            detail=f"LLM unavailable: {exc}.",
         ) from exc
     return {"id": anomaly_id, "response": text}
 
