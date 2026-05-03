@@ -199,6 +199,83 @@ def forecast_7day(
     }
 
 
+# ── 30-day monthly forecast ──────────────────────────────────────────────────
+
+@router.get("/30day")
+def forecast_30day(
+    state: str = "Maharashtra",
+    model: str = Query(default="synthetic"),
+):
+    """Rolling 30-day daily demand forecast."""
+    now   = datetime.now(timezone.utc)
+    today = now.date()
+    DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    days  = []
+
+    loaded_models = [m["key"] for m in get_model_registry() if m["loaded"]] if model == "all" else [model]
+
+    for d in range(30):
+        dt  = today + timedelta(days=d)
+        wd  = dt.weekday()
+        hourly_vals = []
+        
+        day_slot = {}
+        for h in range(24):
+            if model == "all":
+                p50_sum = 0
+                for m_key in loaded_models:
+                    _, p50, _ = predict_hourly(m_key, h, wd)
+                    day_slot.setdefault(f"{m_key}_p50", []).append(p50)
+                    p50_sum += p50
+                hourly_vals.append(p50_sum / max(1, len(loaded_models)))
+            else:
+                _, p50, _ = predict_hourly(model, h, wd)
+                hourly_vals.append(p50)
+
+        mean_mw    = round(sum(hourly_vals) / 24, 1)
+        peak_mw    = max(hourly_vals)
+        trough_mw  = min(hourly_vals)
+        peak_hour  = hourly_vals.index(peak_mw)
+        trough_hour = hourly_vals.index(trough_mw)
+
+        maint_score  = round(1.0 - DAY_FACTOR[wd], 2)
+        units_needed = math.ceil(peak_mw / 2_500)
+
+        days.append({
+            "day":              d,
+            "date":             dt.strftime("%Y-%m-%d"),
+            "day_name":         DAY_NAMES[wd],
+            "weekday":          wd,
+            "mean_mw":          mean_mw,
+            "peak_mw":          round(peak_mw, 1),
+            "trough_mw":        round(trough_mw, 1),
+            "peak_hour":        f"{peak_hour:02d}:00",
+            "trough_hour":      f"{trough_hour:02d}:00",
+            "maintenance_score": maint_score,
+            "maintenance_ok":   maint_score >= 0.10,
+            "units_needed":     units_needed,
+            "procurement_flag": mean_mw > BASE_MW * 0.97,
+        })
+
+    best_maint = max(days, key=lambda d: d["maintenance_score"])
+
+    return {
+        "state":         state,
+        "model":         model,
+        "generated_at":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "horizon_days":  30,
+        "days":          days,
+        "summary": {
+            "best_maintenance_day":  best_maint["day_name"],
+            "best_maintenance_date": best_maint["date"],
+            "procurement_days":      [d["day_name"] for d in days if d["procurement_flag"]],
+            "max_units_needed":      max(d["units_needed"] for d in days),
+        },
+    }
+
+
+
+
 # ── Peak hour prediction ─────────────────────────────────────────────────────
 
 @router.get("/peak-hours")
