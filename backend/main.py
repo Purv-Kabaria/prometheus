@@ -7,8 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-from routers.agent import router as agent_router
+try:
+    from routers.agent import router as agent_router
+except Exception:
+    agent_router = None
 from routers.forecast import router as forecast_router
+from routers.anomalies import router as anomalies_router
 # New Pipeline router from upstream
 from routers import pipeline as pipeline_router
 # Operational Intelligence routers
@@ -65,8 +69,10 @@ app.add_middleware(
 )
 
 # ── Include All Routers ──────────────────────────────────────────────────────
-app.include_router(agent_router)
+if agent_router is not None:
+    app.include_router(agent_router)
 app.include_router(forecast_router)
+app.include_router(anomalies_router)
 app.include_router(pipeline_router.router)
 app.include_router(live_router)
 app.include_router(performance_router)
@@ -84,7 +90,7 @@ async def startup_event():
 def root():
     return {
         "status": "Prometheus API is running",
-        "modules": ["Agent", "Forecasting", "Pipeline", "Operational Intelligence"],
+        "modules": ["Agent", "Forecasting", "Anomalies", "Pipeline", "Operational Intelligence"],
         "version": "2.1.0"
     }
 

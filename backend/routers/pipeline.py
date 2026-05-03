@@ -44,6 +44,8 @@ def _enrich_anomaly_llm_task(anomaly_ids: list) -> None:
         enrich_anomalies_llm(anomaly_ids)
     except Exception:
         logger.exception("Background LLM anomaly enrich failed")
+
+
 REGISTRY_PATH = BASE_DIR / "models" / "registry.json"
 DATA_STORE    = BASE_DIR / "data" / "gold_standard.csv"
 MODEL_DIR     = BASE_DIR / "models"
