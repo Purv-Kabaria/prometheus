@@ -206,8 +206,10 @@ async def _spawn_retrain(job_id: str, data_path: str, new_version: str, parent_v
     def wait_proc():
         return proc.wait()
 
-    return_code = await asyncio.to_thread(wait_proc)
-    log_fh.close()
+    try:
+        return_code = await asyncio.to_thread(wait_proc)
+    finally:
+        log_fh.close()
 
     if return_code == 0:
         JOBS[job_id]["status"] = "done"
@@ -241,8 +243,13 @@ async def upload_data(
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     safe_name = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_{file.filename}"
     temp_path = UPLOAD_DIR / safe_name
-    with open(temp_path, "wb") as buf:
-        shutil.copyfileobj(file.file, buf)
+    try:
+        with open(temp_path, "wb") as buf:
+            shutil.copyfileobj(file.file, buf)
+    except Exception as exc:
+        if temp_path.exists():
+            temp_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Failed to write uploaded file: {exc}")
 
     new_ids: list = []
     # Validate & merge (synchronous — fast, IO-bound)

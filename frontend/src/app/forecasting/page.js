@@ -625,11 +625,17 @@ export default function ForecastingPage() {
     setError(null);
     try {
       const qs = `model=${m}`;
+      const fetchRobust = async (url) => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP error ${res.status} at ${url}`);
+        return res.json();
+      };
+      
       const [r24h, r7d, rPeak, rOff] = await Promise.all([
-        fetch(`${API}/24h?${qs}`).then(r => r.json()),
-        fetch(`${API}/7day?${qs}`).then(r => r.json()),
-        fetch(`${API}/peak-hours?days=7&${qs}`).then(r => r.json()),
-        fetch(`${API}/offpeak?${qs}`).then(r => r.json()),
+        fetchRobust(`${API}/24h?${qs}`),
+        fetchRobust(`${API}/7day?${qs}`),
+        fetchRobust(`${API}/peak-hours?days=7&${qs}`),
+        fetchRobust(`${API}/offpeak?${qs}`),
       ]);
       setData24h(r24h);
       setData7d(r7d);

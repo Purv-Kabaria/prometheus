@@ -142,12 +142,16 @@ export default function ReportingPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [histRes, repsRes] = await Promise.all([
-        fetch(`${API}/api/grid-history?freq=${freq}&limit=2000&model=${activeModel}`),
-        fetch(`${API}/api/reports`),
+      const fetchRobust = async (url) => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        return res.json();
+      };
+      
+      const [hist, reps] = await Promise.all([
+        fetchRobust(`${API}/api/grid-history?freq=${freq}&limit=2000&model=${activeModel}`),
+        fetchRobust(`${API}/api/reports`),
       ]);
-
-      const [hist, reps] = await Promise.all([histRes.json(), repsRes.json()]);
       setHistoryData(hist.data || []);
       setReports(reps || []);
     } catch (e) {
