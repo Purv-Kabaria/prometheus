@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import ReactMarkdown from "react-markdown";
 import Card from "@/components/Card";
+
 const API_BASE = "http://localhost:8000";
 
 const severityColors = {
@@ -262,91 +263,90 @@ export default function AnomalyPage() {
   };
 
   return (
-    <div>
-      <header style={{ marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "30px", fontWeight: "800", letterSpacing: "-0.02em", marginBottom: "6px" }}>
-          Anomaly Detection & Explainability
-        </h1>
-        <p style={{ color: "var(--muted)", fontSize: "14px" }}>
-          Live triage console for ingestion anomalies, LLM root-cause interpretation, and operator acknowledgment.
-        </p>
-        <div style={{ marginTop: "16px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+    <div style={{ paddingBottom: "80px" }}>
+      <header style={{ marginBottom: "48px" }}>
+        <h1 className="serif" style={{ fontSize: "36px", fontWeight: "400", marginBottom: "8px" }}>Anomaly analysis</h1>
+        <p style={{ color: "var(--muted)", fontSize: "15px" }}>Automated event detection and LLM-assisted root cause analysis</p>
+        
+        <div style={{ marginTop: "32px", display: "flex", gap: "12px" }}>
           <button
-            type="button"
             onClick={load}
             disabled={loading}
             style={{
-              padding: "8px 16px",
+              padding: "10px 20px",
               borderRadius: "8px",
               border: "1px solid var(--surface-border)",
               background: "var(--surface)",
               cursor: loading ? "wait" : "pointer",
-              fontWeight: 600,
+              fontWeight: "600",
+              fontSize: "13px"
             }}
           >
-            Refresh
+            Refresh data
           </button>
           <button
             type="button"
             onClick={ackVisible}
             disabled={ackBusy || filteredAnomalies.filter((a) => !a.acknowledged).length === 0}
             style={{
-              padding: "8px 16px",
+              padding: "10px 20px",
               borderRadius: "8px",
               border: "1px solid var(--surface-border)",
               background: "var(--surface)",
               cursor: ackBusy ? "wait" : "pointer",
-              fontWeight: 600,
+              fontWeight: "600",
+              fontSize: "13px"
             }}
           >
             {ackBusy ? "Acknowledging…" : "Acknowledge visible"}
           </button>
           <button
-            type="button"
             onClick={runRescan}
             disabled={rescanBusy}
             style={{
-              padding: "8px 16px",
+              padding: "10px 20px",
               borderRadius: "8px",
               border: "none",
               background: "var(--primary)",
-              color: "var(--primary-foreground)",
+              color: "white",
               cursor: rescanBusy ? "wait" : "pointer",
-              fontWeight: 600,
+              fontWeight: "600",
+              fontSize: "13px"
             }}
           >
-            {rescanBusy ? "Scanning…" : "Rescan gold data tail"}
+            {rescanBusy ? "Analyzing historical data..." : "Trigger system rescan"}
           </button>
         </div>
-        {error ? (
-          <p style={{ color: "var(--danger)", marginTop: "12px", fontSize: "14px" }}>{error}</p>
-        ) : null}
+        {error && (
+          <p style={{ color: "var(--danger)", marginTop: "16px", fontSize: "13px" }}>{error}</p>
+        )}
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "12px", marginBottom: "20px" }}>
-        <Card title="Total anomalies" value={String(metrics.total)} subtext="Local log records" />
-        <Card title="Active alerts" value={String(metrics.active)} subtext="Unacknowledged entries" type={metrics.active ? "warning" : "success"} />
-        <Card title="High severity" value={String(metrics.high)} subtext="Immediate review priority" type={metrics.high ? "danger" : "success"} />
-        <Card title="Spike events" value={String(metrics.spike)} subtext="Positive excursions" />
-        <Card title="LLM explained" value={String(metrics.explained)} subtext={`${metrics.total ? Math.round((metrics.explained / metrics.total) * 100) : 0}% coverage`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "20px", marginBottom: "48px" }}>
+        <Card title="Total anomalies" value={String(metrics.total)} subtext="Local log records" accentColor="var(--primary)" />
+        <Card title="Active alerts" value={String(metrics.active)} subtext="Unacknowledged entries" accentColor={metrics.active ? "var(--warning)" : "var(--success)"} />
+        <Card title="High severity" value={String(metrics.high)} subtext="Review priority" accentColor={metrics.high ? "var(--danger)" : "var(--success)"} />
+        <Card title="Spike events" value={String(metrics.spike)} subtext="Positive excursions" accentColor="var(--primary)" />
+        <Card title="LLM explained" value={String(metrics.explained)} subtext={`${metrics.total ? Math.round((metrics.explained / metrics.total) * 100) : 0}% coverage`} accentColor="var(--primary)" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: "24px", marginBottom: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "48px", marginBottom: "48px" }}>
         <div
           style={{
             background: "var(--surface)",
             border: "1px solid var(--surface-border)",
             borderRadius: "var(--radius)",
-            padding: "24px",
+            padding: "32px",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: "700" }}>Residual monitor</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
+            <h3 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              Residual vs Rolling Baseline ({windowHours}h)
+            </h3>
             <div style={{ display: "flex", gap: "8px" }}>
               {[24, 72, 168].map((h) => (
                 <button
                   key={h}
-                  type="button"
                   onClick={() => setWindowHours(h)}
                   style={{
                     padding: "4px 10px",
@@ -354,8 +354,9 @@ export default function AnomalyPage() {
                     border: "1px solid var(--surface-border)",
                     background: windowHours === h ? "var(--accent)" : "var(--surface)",
                     color: windowHours === h ? "var(--primary)" : "var(--muted)",
-                    fontSize: "12px",
+                    fontSize: "10px",
                     fontWeight: 700,
+                    textTransform: "uppercase"
                   }}
                 >
                   {h}h
@@ -364,7 +365,9 @@ export default function AnomalyPage() {
             </div>
           </div>
           {chartSlice.length === 0 ? (
-            <p style={{ color: "var(--muted)" }}>No gold_standard.csv data yet. Upload via Upload &amp; Retrain.</p>
+            <div style={{ padding: "60px", textAlign: "center", color: "var(--muted)" }}>
+              <p style={{ fontSize: "14px" }}>No operational data detected. Ensure grid streams are active.</p>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={320}>
               <ComposedChart data={chartSlice} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -373,18 +376,19 @@ export default function AnomalyPage() {
                   dataKey="label"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "var(--muted)", fontSize: 11 }}
+                  tick={{ fill: "var(--muted)", fontSize: 10 }}
                   dy={10}
                 />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 11 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} />
                 <Tooltip
                   contentStyle={{
                     background: "var(--surface)",
                     borderRadius: "8px",
                     border: "1px solid var(--surface-border)",
+                    fontSize: "12px"
                   }}
                 />
-                <Bar dataKey="residual" name="Residual" fill="var(--warning)" barSize={4}>
+                <Bar dataKey="residual" name="Residual" fill="var(--primary)" barSize={4}>
                   {chartSlice.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
@@ -392,220 +396,220 @@ export default function AnomalyPage() {
                     />
                   ))}
                 </Bar>
-                <Line type="monotone" dataKey="mwh" name="MWh" stroke="var(--primary)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="mwh" name="MWh" stroke="var(--primary)" strokeWidth={2} dot={false} opacity={0.3} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <Card title="Ollama + LangChain">
-          <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "12px" }}>Selected anomaly</h3>
-          <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "12px" }}>
-            Pick an event below. Explain calls your configured Ollama model through LangChain.
-          </p>
-          <div style={{ marginBottom: "12px", display: "grid", gap: "8px" }}>
-            <div style={{ fontSize: "12px", color: "var(--muted)" }}>ID</div>
-            <div style={{ fontFamily: "var(--font-geist-mono)", fontSize: "12px" }}>{selected?.id || "—"}</div>
-            <div style={{ fontSize: "12px", color: "var(--muted)" }}>Timestamp (UTC)</div>
-            <div style={{ fontSize: "13px" }}>{formatUtc(selected?.timestamp_utc)}</div>
-            <div style={{ fontSize: "12px", color: "var(--muted)" }}>Telemetry</div>
-            <div style={{ fontSize: "13px" }}>
-              {selected ? `${selected.kind} | z=${selected.z_score} | Δ ${selected.delta_mwh} MWh` : "—"}
+        <aside style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <div style={{ background: "var(--accent)", borderRadius: "var(--radius)", padding: "24px" }}>
+            <h4 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>
+              Intelligence output
+            </h4>
+            
+            <div style={{ marginBottom: "20px", display: "grid", gap: "8px" }}>
+              <div style={{ fontSize: "10px", color: "var(--muted)", textTransform: "uppercase" }}>Selected Event</div>
+              <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: "600" }}>{selected?.id?.slice(0, 8) || "—"}</div>
+              <div style={{ fontSize: "10px", color: "var(--muted)", textTransform: "uppercase" }}>Timestamp</div>
+              <div style={{ fontSize: "12px" }}>{formatUtc(selected?.timestamp_utc)}</div>
             </div>
-          </div>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-            <button
-              type="button"
-              onClick={runExplainSelected}
-              disabled={!selected || explainBusy}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "none",
-                background: "var(--primary)",
-                color: "var(--primary-foreground)",
-                fontWeight: 700,
-                fontSize: "12px",
-                cursor: !selected || explainBusy ? "not-allowed" : "pointer",
-              }}
-            >
-              {explainBusy ? "Explaining…" : "Explain selected"}
-            </button>
-            <button
-              type="button"
-              onClick={ackSelected}
-              disabled={!selected || selected?.acknowledged || ackBusy}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--surface-border)",
-                background: "var(--surface)",
-                fontWeight: 700,
-                fontSize: "12px",
-                cursor: !selected || selected?.acknowledged || ackBusy ? "not-allowed" : "pointer",
-              }}
-            >
-              {selected?.acknowledged ? "Acknowledged" : ackBusy ? "Acknowledging…" : "Acknowledge"}
-            </button>
-          </div>
-          <div
-            style={{
-              minHeight: "200px",
-              padding: "16px",
-              borderRadius: "8px",
-              background: "var(--accent)",
-              fontSize: "14px",
-              lineHeight: 1.6,
-            }}
-          >
-            {explainBusy ? (
-              "Calling Ollama…"
-            ) : explainText || selected?.explanation ? (
-              <ReactMarkdown components={MD_COMPONENTS}>
-                {explainText || selected?.explanation}
-              </ReactMarkdown>
-            ) : (
-              "No explanation yet. Select anomaly and click Explain."
-            )}
-          </div>
-          <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
-            Scan note: {selected?.llm_scan_note || "Not generated yet"}
-          </div>
 
-          <div style={{ marginTop: "20px", borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
-            <h4 style={{ fontSize: "14px", fontWeight: "600", marginBottom: "8px" }}>Ask about this anomaly</h4>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <input
-                value={chatQuery}
-                onChange={(e) => setChatQuery(e.target.value)}
-                placeholder="E.g., What are the possible reasons for this spike?"
-                disabled={!selected || chatBusy}
-                onKeyDown={(e) => { if (e.key === "Enter") runChat(); }}
-                style={{
-                  flex: 1, padding: "8px 12px", borderRadius: "6px",
-                  border: "1px solid var(--surface-border)", background: "var(--background)",
-                  color: "var(--foreground)", fontSize: "13px"
-                }}
-              />
+            <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
               <button
-                onClick={runChat}
-                disabled={!selected || chatBusy || !chatQuery.trim()}
+                onClick={runExplainSelected}
+                disabled={!selected || explainBusy}
                 style={{
-                  padding: "8px 16px", borderRadius: "6px", border: "none",
-                  background: "var(--primary)", color: "var(--primary-foreground)",
-                  fontWeight: 600, cursor: (!selected || chatBusy || !chatQuery.trim()) ? "not-allowed" : "pointer",
-                  fontSize: "13px"
+                  flex: 1,
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "var(--primary)",
+                  color: "white",
+                  fontWeight: 700,
+                  fontSize: "11px",
+                  textTransform: "uppercase",
+                  cursor: !selected || explainBusy ? "not-allowed" : "pointer",
                 }}
               >
-                {chatBusy ? "Asking…" : "Ask"}
+                {explainBusy ? "Explaining…" : "Explain"}
+              </button>
+              <button
+                onClick={ackSelected}
+                disabled={!selected || selected?.acknowledged || ackBusy}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--surface-border)",
+                  background: "var(--surface)",
+                  fontWeight: 700,
+                  fontSize: "11px",
+                  textTransform: "uppercase",
+                  cursor: !selected || selected?.acknowledged || ackBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                {selected?.acknowledged ? "ACK'D" : "ACK"}
               </button>
             </div>
-            
-            {chatResponse && (
-              <div style={{
-                marginTop: "12px", padding: "12px", borderRadius: "8px",
-                background: "var(--accent)", fontSize: "13px", lineHeight: 1.6,
-                color: "var(--foreground)"
-              }}>
+
+            <div
+              style={{
+                minHeight: "200px",
+                fontSize: "14px",
+                lineHeight: "1.6",
+                color: "var(--foreground)",
+                overflowY: "auto",
+                maxHeight: "300px"
+              }}
+            >
+              {explainBusy ? (
+                <div style={{ color: "var(--muted)", fontSize: "13px" }}>Synthesizing event data...</div>
+              ) : explainText || selected?.explanation ? (
                 <ReactMarkdown components={MD_COMPONENTS}>
-                  {chatResponse}
+                  {explainText || selected?.explanation}
                 </ReactMarkdown>
+              ) : (
+                <div style={{ color: "var(--muted)", fontSize: "13px" }}>Select an event from the log to generate an LLM-powered causal explanation.</div>
+              )}
+            </div>
+
+            <div style={{ marginTop: "24px", borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  value={chatQuery}
+                  onChange={(e) => setChatQuery(e.target.value)}
+                  placeholder="Ask about this event..."
+                  disabled={!selected || chatBusy}
+                  onKeyDown={(e) => { if (e.key === "Enter") runChat(); }}
+                  style={{
+                    flex: 1, padding: "8px 12px", borderRadius: "6px",
+                    border: "1px solid var(--surface-border)", background: "var(--surface)",
+                    color: "var(--foreground)", fontSize: "12px"
+                  }}
+                />
+                <button
+                  onClick={runChat}
+                  disabled={!selected || chatBusy || !chatQuery.trim()}
+                  style={{
+                    padding: "8px 12px", borderRadius: "6px", border: "none",
+                    background: "var(--primary)", color: "white",
+                    fontWeight: 600, cursor: (!selected || chatBusy || !chatQuery.trim()) ? "not-allowed" : "pointer",
+                    fontSize: "12px"
+                  }}
+                >
+                  {chatBusy ? "..." : "Ask"}
+                </button>
               </div>
-            )}
+              
+              {chatResponse && (
+                <div style={{
+                  marginTop: "12px", padding: "12px", borderRadius: "8px",
+                  background: "var(--surface)", fontSize: "12px", lineHeight: 1.6,
+                  color: "var(--foreground)", border: "1px solid var(--surface-border)"
+                }}>
+                  <ReactMarkdown components={MD_COMPONENTS}>
+                    {chatResponse}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
           </div>
-        </Card>
+        </aside>
       </div>
 
-      <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "14px", marginBottom: "12px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.7fr 0.7fr 0.7fr 0.8fr", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+        <h2 className="serif" style={{ fontSize: "24px", fontWeight: "400" }}>Event log</h2>
+        <span style={{ background: "var(--accent)", color: "var(--primary)", fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px" }}>
+          SYSTEM RECORD
+        </span>
+      </div>
+
+      <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "16px", marginBottom: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 180px 180px 180px", gap: "12px" }}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by id, timestamp, note, filename..."
-            style={{ padding: "10px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--background)", color: "var(--foreground)" }}
+            placeholder="Search anomalies..."
+            style={{ padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--foreground)", fontSize: "13px" }}
           />
-          <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--background)", color: "var(--foreground)" }}>
+          <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--foreground)", fontSize: "13px" }}>
             <option value="all">All severities</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-          <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--background)", color: "var(--foreground)" }}>
+          <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--foreground)", fontSize: "13px" }}>
             <option value="all">All kinds</option>
             <option value="spike">Spike</option>
             <option value="dip">Dip</option>
           </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--background)", color: "var(--foreground)" }}>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--foreground)", fontSize: "13px" }}>
             {sortOptions.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
             ))}
           </select>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "var(--muted)" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--muted)", cursor: "pointer" }}>
             <input type="checkbox" checked={onlyUnacked} onChange={(e) => setOnlyUnacked(e.target.checked)} />
             Unacknowledged only
           </label>
         </div>
       </div>
 
-      <h3 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "10px" }}>
-        Anomaly log ({filteredAnomalies.length} shown)
-      </h3>
       <div
         style={{
           background: "var(--surface)",
           border: "1px solid var(--surface-border)",
           borderRadius: "var(--radius)",
-          overflow: "auto",
+          overflow: "hidden",
         }}
       >
-        <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse", fontSize: "14px" }}>
+        <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead>
-            <tr style={{ background: "var(--accent)", color: "var(--muted)" }}>
-              <th style={{ padding: "14px 16px", fontWeight: "600" }}>Time (UTC)</th>
-              <th style={{ padding: "14px 16px", fontWeight: "600" }}>Signal</th>
-              <th style={{ padding: "14px 16px", fontWeight: "600" }}>Severity</th>
-              <th style={{ padding: "14px 16px", fontWeight: "600" }}>LLM scan note</th>
-              <th style={{ padding: "14px 16px", fontWeight: "600" }}>State</th>
-              <th style={{ padding: "14px 16px", fontWeight: "600" }}>Actions</th>
+            <tr style={{ borderBottom: "1px solid var(--surface-border)", background: "var(--accent)" }}>
+              <th style={{ padding: "16px 24px", fontWeight: "600", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Timestamp</th>
+              <th style={{ padding: "16px 24px", fontWeight: "600", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Category</th>
+              <th style={{ padding: "16px 24px", fontWeight: "600", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>z-score</th>
+              <th style={{ padding: "16px 24px", fontWeight: "600", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Severity</th>
+              <th style={{ padding: "16px 24px", fontWeight: "600", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredAnomalies.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: "24px", color: "var(--muted)" }}>
-                  No matching anomalies. Adjust filters or run &quot;Rescan gold data tail&quot;.
+                <td colSpan={5} style={{ padding: "48px", textAlign: "center", color: "var(--muted)" }}>
+                  No significant anomalies detected in the current window.
                 </td>
               </tr>
             ) : (
               filteredAnomalies.map((a) => (
-                <tr
-                  key={a.id}
+                <tr 
+                  key={a.id} 
                   onClick={() => {
                     setSelectedId(a.id);
                     setChatResponse("");
                     setChatQuery("");
                   }}
-                  style={{
-                    borderTop: "1px solid var(--surface-border)",
+                  style={{ 
+                    borderBottom: "1px solid var(--surface-border)", 
                     background: currentSelectedId === a.id ? "var(--accent)" : "transparent",
                     cursor: "pointer",
+                    transition: "background 0.2s"
                   }}
                 >
-                  <td style={{ padding: "14px 16px", fontFamily: "var(--font-geist-mono)", fontSize: "12px" }}>
-                    {formatUtc(a.timestamp_utc)}
-                  </td>
-                  <td style={{ padding: "14px 16px", fontWeight: 600 }}>
-                    {a.kind} | z={a.z_score} | Δ {a.delta_mwh}
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
+                  <td style={{ padding: "16px 24px", color: "var(--muted)" }}>{formatUtc(a.timestamp_utc)}</td>
+                  <td style={{ padding: "16px 24px", fontWeight: "500" }}>{a.kind}</td>
+                  <td style={{ padding: "16px 24px", fontWeight: "600" }}>{a.z_score}</td>
+                  <td style={{ padding: "16px 24px" }}>
                     <span
                       style={{
-                        padding: "4px 8px",
+                        padding: "2px 8px",
                         borderRadius: "4px",
-                        fontSize: "12px",
-                        fontWeight: "bold",
+                        fontSize: "10px",
+                        fontWeight: "700",
+                        textTransform: "uppercase",
                         background: severityColors[a.severity] || "var(--muted)",
                         color: "#fff",
                       }}
@@ -613,54 +617,40 @@ export default function AnomalyPage() {
                       {a.severity}
                     </span>
                   </td>
-                  <td style={{ padding: "14px 16px", color: "var(--muted)", maxWidth: "340px" }}>
-                    {a.llm_scan_note || "—"}
-                  </td>
-                  <td style={{ padding: "14px 16px", fontSize: "12px", color: "var(--muted)" }}>
-                    {a.acknowledged ? "Acknowledged" : "Active"}
-                    {a.upload_filename ? ` • ${a.upload_filename}` : ""}
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <td style={{ padding: "16px 24px" }}>
+                    <div style={{ display: "flex", gap: "12px" }}>
                       <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          runExplain(a.id);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); runExplain(a.id); }}
                         style={{
-                          padding: "6px 12px",
-                          borderRadius: "6px",
+                          background: "none",
                           border: "none",
-                          background: "var(--primary)",
-                          color: "var(--primary-foreground)",
-                          fontWeight: 600,
+                          color: "var(--primary)",
+                          fontWeight: "700",
                           cursor: "pointer",
-                          fontSize: "12px",
+                          fontSize: "11px",
+                          textTransform: "uppercase",
+                          padding: "0"
                         }}
                       >
                         Explain
                       </button>
-                      {!a.acknowledged ? (
+                      {!a.acknowledged && (
                         <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            ack(a.id);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); ack(a.id); }}
                           style={{
-                            padding: "6px 12px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--surface-border)",
-                            background: "var(--surface)",
-                            fontWeight: 600,
+                            background: "none",
+                            border: "none",
+                            color: "var(--muted)",
+                            fontWeight: "700",
                             cursor: "pointer",
-                            fontSize: "12px",
+                            fontSize: "11px",
+                            textTransform: "uppercase",
+                            padding: "0"
                           }}
                         >
-                          Ack
+                          Acknowledge
                         </button>
-                      ) : null}
+                      )}
                     </div>
                   </td>
                 </tr>

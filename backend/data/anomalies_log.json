@@ -14,7 +14,7 @@
     "llm_scan_note": null,
     "explanation": null,
     "explained_at": null,
-    "acknowledged": false,
+    "acknowledged": true,
     "created_at": "2026-05-03T13:44:28.571577+00:00"
   },
   {
@@ -32,7 +32,7 @@
     "llm_scan_note": null,
     "explanation": null,
     "explained_at": null,
-    "acknowledged": false,
+    "acknowledged": true,
     "created_at": "2026-05-03T13:44:28.573796+00:00"
   },
   {
@@ -50,7 +50,7 @@
     "llm_scan_note": null,
     "explanation": null,
     "explained_at": null,
-    "acknowledged": false,
+    "acknowledged": true,
     "created_at": "2026-05-03T13:44:28.575902+00:00"
   },
   {
