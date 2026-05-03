@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import shutil
 import sys
@@ -31,7 +32,18 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 router = APIRouter(prefix="/pipeline", tags=["ML Pipeline"])
 
+logger = logging.getLogger(__name__)
+
 BASE_DIR      = Path(__file__).resolve().parent.parent   # …/backend
+
+
+def _enrich_anomaly_llm_task(anomaly_ids: list) -> None:
+    try:
+        from anomaly_pipeline import enrich_anomalies_llm
+
+        enrich_anomalies_llm(anomaly_ids)
+    except Exception:
+        logger.exception("Background LLM anomaly enrich failed")
 REGISTRY_PATH = BASE_DIR / "models" / "registry.json"
 DATA_STORE    = BASE_DIR / "data" / "gold_standard.csv"
 MODEL_DIR     = BASE_DIR / "models"
@@ -226,10 +238,21 @@ async def upload_data(
     with open(temp_path, "wb") as buf:
         shutil.copyfileobj(file.file, buf)
 
+    new_ids: list = []
     # Validate & merge (synchronous — fast, IO-bound)
     try:
         df = pd.read_csv(temp_path)
         merged = validate_and_merge(df)
+        try:
+            from anomaly_pipeline import run_post_ingest_anomaly_scan
+
+            new_ids = run_post_ingest_anomaly_scan(
+                df, merged, file.filename, use_llm_scan=False
+            )
+            if new_ids:
+                logger.info("Ingestion anomaly scan logged %s event(s)", len(new_ids))
+        except Exception:
+            logger.exception("Post-ingest anomaly scan failed")
     except ValueError as exc:
         temp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=str(exc))
@@ -258,6 +281,8 @@ async def upload_data(
     background_tasks.add_task(
         _spawn_retrain, job_id, str(temp_path), new_v, parent_v
     )
+    if new_ids:
+        background_tasks.add_task(_enrich_anomaly_llm_task, new_ids)
 
     return {
         "message":     "File validated and merged. Retraining triggered.",

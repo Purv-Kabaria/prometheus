@@ -31,7 +31,12 @@ tqdm>=4.66.0
 lightgbm
 xgboost>=2.0.0
 joblib
-ollama
+ollama>=0.3.0
+
+# --- LLMs & Language Chains ---
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-core>=0.3.0
 
 # --- Intelligence & Reporting ---
 reportlab
