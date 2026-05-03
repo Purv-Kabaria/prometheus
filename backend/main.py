@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routers import agent
+from routers import agent, forecast
 
 app = FastAPI(title="Prometheus Grid API")
 
@@ -14,6 +14,7 @@ app.add_middleware(
 )
 
 app.include_router(agent.router)
+app.include_router(forecast.router)
 
 @app.get("/")
 def read_root():

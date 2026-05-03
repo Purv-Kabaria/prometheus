@@ -13,3 +13,9 @@ darts>=0.29.0
 arch>=6.3.0
 jupyterlab
 ipykernel
+# PyTorch — install with CUDA 12.8 (RTX 4050):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+torch>=2.2.0
+torchvision
+torchaudio
+tqdm>=4.66.0
