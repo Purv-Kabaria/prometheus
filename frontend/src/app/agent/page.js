@@ -79,6 +79,21 @@ export default function AgentDecisionsPage() {
     return () => clearInterval(t);
   }, [fetchProposals, fetchTelemetry]);
 
+  // ── Poll until a job_id resolves ────────────────────────────────────────────
+  const pollJobResult = async (job_id) => {
+    for (let i = 0; i < 48; i++) {                   // max ~2 min, every 2.5s
+      await new Promise(r => setTimeout(r, 2500));
+      try {
+        const res  = await fetch(`${API_BASE}/status/${job_id}`);
+        const data = await res.json();
+        if (data.status === 'done' || data.status === 'error') {
+          return data.details;
+        }
+      } catch { /* retry */ }
+    }
+    return null;   // timed out
+  };
+
   // ── Trigger agent run ────────────────────────────────────────────────────────
   const triggerAgent = async (e) => {
     if (e) e.preventDefault();
@@ -100,11 +115,14 @@ export default function AgentDecisionsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      const reply = data.details?.final_response;
+      const { job_id } = await res.json();
+      const result = await pollJobResult(job_id);
+      const reply  = result?.final_response;
       
       if (reply) {
         setMessages(prev => [...prev, { role: 'agent', text: reply, timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
+      } else if (!result) {
+        setMessages(prev => [...prev, { role: 'agent', text: 'Request timed out. Please check backend connectivity.', timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
       }
       await fetchProposals();
     } catch (err) {
@@ -145,8 +163,9 @@ export default function AgentDecisionsPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt: overridePrompt }),
           });
-          const data = await res.json();
-          const reply = data.details?.final_response;
+          const { job_id } = await res.json();
+          const result = await pollJobResult(job_id);
+          const reply  = result?.final_response;
           if (reply) {
             setMessages(prev => [...prev, { role: 'agent', text: reply, timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
           }

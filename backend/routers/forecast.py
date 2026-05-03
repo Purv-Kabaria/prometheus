@@ -434,6 +434,13 @@ def forecast_offpeak(
 
 # ── Explainability: SHAP and LIME XAI ──────────────────────────────────────────
 
+_SHAP_FEATURE_NAMES = [
+    "sin_hour", "cos_hour", "sin_month", "cos_month",
+    "sin_weekday", "cos_weekday", "hour", "weekday", "month",
+    "lag_1h", "lag_24h", "lag_168h",
+    "roll_mean_24h", "roll_std_24h", "base_demand", "lag_diff", "zero_feat",
+]
+
 @router.get("/explain")
 def forecast_explain(
     model: str = Query(default="synthetic", description="Model key: synthetic | lgbm | tcn_xgb"),
@@ -441,59 +448,112 @@ def forecast_explain(
     weekday: int = Query(default=0, ge=0, le=6),
 ):
     """
-    Computes SHAP and LIME-style feature contribution values for a given prediction.
+    Computes SHAP feature contributions for the given hour/weekday combination.
+    Uses real shap.TreeExplainer when the LightGBM model is loaded; otherwise falls
+    back to a domain-calibrated simulation clearly labelled as 'simulated'.
     """
-    import math
-    import random
+    import math, numpy as np
 
-    # Derive feature values based on state inputs
+    # ── Attempt real SHAP via LightGBM P50 model ──────────────────────────────
+    try:
+        from .model_inference import _load_lgbm, _lgbm_models, _lgbm_features
+        import shap
+
+        if _load_lgbm() and _lgbm_models and "p50" in _lgbm_models:
+            lgbm_model = _lgbm_models["p50"]
+            feat_vals  = _lgbm_features(hour, weekday)         # list[float], len 17
+            X          = np.array([feat_vals])
+
+            explainer  = shap.TreeExplainer(lgbm_model)
+            raw_shap   = explainer.shap_values(X)              # shape (1, 17)
+            shap_row   = raw_shap[0] if raw_shap.ndim == 2 else raw_shap
+
+            base_val   = float(explainer.expected_value)
+            prediction = float(lgbm_model.predict(X)[0])
+
+            shap_impacts = sorted(
+                [
+                    {
+                        "feature": _SHAP_FEATURE_NAMES[i] if i < len(_SHAP_FEATURE_NAMES) else f"feat_{i}",
+                        "value":   round(float(feat_vals[i]), 4),
+                        "impact":  round(float(shap_row[i]), 4),
+                    }
+                    for i in range(len(shap_row))
+                ],
+                key=lambda x: abs(x["impact"]),
+                reverse=True,
+            )
+
+            # LIME-style: use SHAP values as local linear approximation coefficients
+            lime_coefs = [
+                {
+                    "feature":      item["feature"],
+                    "coefficient":  round(item["impact"] / max(abs(item["value"]), 1e-6), 4),
+                    "local_value":  item["value"],
+                }
+                for item in shap_impacts[:5]
+            ]
+
+            top = shap_impacts[0]
+            return {
+                "model":             model,
+                "source":            "real_shap",          # ← explicit: real TreeExplainer
+                "hour":              hour,
+                "weekday":           weekday,
+                "base_value":        round(base_val, 3),
+                "prediction":        round(prediction, 3),
+                "shap_values":       shap_impacts[:7],
+                "lime_explanations": lime_coefs,
+                "summary": (
+                    f"Real SHAP (TreeExplainer on LightGBM P50). "
+                    f"Top driver: {top['feature']} (impact {top['impact']:+.3f}). "
+                    f"Base value: {base_val:.3f} → prediction: {prediction:.3f}."
+                ),
+            }
+    except Exception as shap_err:
+        # Non-fatal — fall through to calibrated simulation
+        print(f"[XAI] Real SHAP unavailable ({shap_err}), using calibrated simulation.")
+
+    # ── Calibrated domain simulation (honest fallback) ─────────────────────────
     features = {
-        "sin_hour": round(math.sin(2 * math.pi * hour / 24), 3),
-        "cos_hour": round(math.cos(2 * math.pi * hour / 24), 3),
-        "sin_dow": round(math.sin(2 * math.pi * weekday / 7), 3),
-        "cos_dow": round(math.cos(2 * math.pi * weekday / 7), 3),
+        "sin_hour":   round(math.sin(2 * math.pi * hour / 24), 3),
+        "cos_hour":   round(math.cos(2 * math.pi * hour / 24), 3),
+        "sin_dow":    round(math.sin(2 * math.pi * weekday / 7), 3),
+        "cos_dow":    round(math.cos(2 * math.pi * weekday / 7), 3),
         "is_weekend": 1.0 if weekday >= 5 else 0.0,
-        "is_peak": 1.0 if 18 <= hour <= 22 else 0.0,
-        "is_solar": 1.0 if 10 <= hour <= 18 else 0.0,
-        "lag_1h": 1.0,
-        "lag_24h": 1.0,
+        "is_peak":    1.0 if 18 <= hour <= 22 else 0.0,
+        "is_solar":   1.0 if 10 <= hour <= 18 else 0.0,
     }
 
-    base = 1.0
-    if model == "synthetic":
-        base = 0.95
-    elif model == "lgbm":
-        base = 1.05
-    else:
-        base = 1.02
-
     shap_impacts = [
-        {"feature": "Time-of-day Peak (is_peak)", "value": features["is_peak"], "impact": round(0.42 * features["is_peak"] * base, 3)},
-        {"feature": "Weekend Reduction (is_weekend)", "value": features["is_weekend"], "impact": round(-0.35 * features["is_weekend"] * base, 3)},
-        {"feature": "Solar Window (is_solar)", "value": features["is_solar"], "impact": round(-0.18 * features["is_solar"] * base, 3)},
-        {"feature": "Lagged Demand (lag_1h)", "value": features["lag_1h"], "impact": round(0.55 * base, 3)},
-        {"feature": "Weekly Trend (lag_168h)", "value": 1.0, "impact": round(0.48 * base, 3)},
-        {"feature": "Time of Day Periodicity (sin_hour)", "value": features["sin_hour"], "impact": round(0.24 * features["sin_hour"] * base, 3)},
-        {"feature": "Day of Week Periodicity (sin_dow)", "value": features["sin_dow"], "impact": round(0.15 * features["sin_dow"] * base, 3)},
+        {"feature": "Time-of-day Peak (is_peak)",        "value": features["is_peak"],    "impact": round(0.42 * features["is_peak"],    3)},
+        {"feature": "Weekend Reduction (is_weekend)",    "value": features["is_weekend"],  "impact": round(-0.35 * features["is_weekend"], 3)},
+        {"feature": "Solar Window (is_solar)",           "value": features["is_solar"],    "impact": round(-0.18 * features["is_solar"],   3)},
+        {"feature": "Lagged Demand (lag_1h)",            "value": 1.0,                     "impact": 0.55},
+        {"feature": "Weekly Trend (lag_168h)",           "value": 1.0,                     "impact": 0.48},
+        {"feature": "Time-of-Day Periodicity (sin_hour)","value": features["sin_hour"],    "impact": round(0.24 * features["sin_hour"],    3)},
+        {"feature": "Day-of-Week Periodicity (sin_dow)", "value": features["sin_dow"],     "impact": round(0.15 * features["sin_dow"],     3)},
     ]
-
     lime_coefs = [
-        {"feature": "is_peak", "coefficient": round(0.38 * base, 3), "local_value": features["is_peak"]},
-        {"feature": "is_weekend", "coefficient": round(-0.29 * base, 3), "local_value": features["is_weekend"]},
-        {"feature": "is_solar", "coefficient": round(-0.14 * base, 3), "local_value": features["is_solar"]},
-        {"feature": "lag_1h", "coefficient": round(0.51 * base, 3), "local_value": features["lag_1h"]},
-        {"feature": "Hourly Periodicity", "coefficient": round(0.22 * base, 3), "local_value": features["sin_hour"]},
+        {"feature": "is_peak",        "coefficient": 0.38,  "local_value": features["is_peak"]},
+        {"feature": "is_weekend",     "coefficient": -0.29, "local_value": features["is_weekend"]},
+        {"feature": "is_solar",       "coefficient": -0.14, "local_value": features["is_solar"]},
+        {"feature": "lag_1h",         "coefficient": 0.51,  "local_value": 1.0},
+        {"feature": "sin_hour",       "coefficient": 0.22,  "local_value": features["sin_hour"]},
     ]
 
-    for item in shap_impacts:
-        item["impact"] += round(random.uniform(-0.015, 0.015), 3)
-
+    top = shap_impacts[0]
     return {
-        "model": model,
-        "hour": hour,
-        "weekday": weekday,
-        "base_value": round(0.72 * base, 3),
-        "shap_values": shap_impacts,
+        "model":             model,
+        "source":            "simulated",    # ← explicit: not real SHAP
+        "hour":              hour,
+        "weekday":           weekday,
+        "base_value":        0.72,
+        "prediction":        None,
+        "shap_values":       shap_impacts,
         "lime_explanations": lime_coefs,
-        "summary": f"Forecast driven primarily by Time-of-Day Peak (+{shap_impacts[0]['impact']:.2f}) and Lagged Demand (+{shap_impacts[3]['impact']:.2f})."
+        "summary": (
+            f"[Simulated — install shap + load LightGBM for real XAI] "
+            f"Forecast driven primarily by {top['feature']} ({top['impact']:+.3f})."
+        ),
     }

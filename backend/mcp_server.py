@@ -3,6 +3,7 @@ import json
 import random
 import sys
 import os
+from datetime import datetime
 
 # Ensure we can import from local directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -10,6 +11,21 @@ from database import add_proposal
 
 # Initialize the FastMCP server for the Grid Agent
 mcp = FastMCP("PrometheusGridAgent")
+
+# ── Equipment registry ────────────────────────────────────────────────────────
+_EQUIPMENT_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "equipment.json")
+
+def _load_equipment() -> list:
+    """Load the configurable equipment list from data/equipment.json."""
+    try:
+        with open(_EQUIPMENT_JSON, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[MCP] Could not load equipment.json: {e}. Using minimal fallback.")
+        return [
+            {"id": "GEN-01", "type": "Coal Power Plant", "capacity_mw": 1200,
+             "maintenance_interval_days": 90, "last_maintained": "2026-02-01"},
+        ]
 
 from routers.forecast import forecast_24h
 
@@ -111,25 +127,16 @@ def get_committed_generation() -> str:
 
 @mcp.tool()
 def get_grid_equipment() -> str:
-    """Get all active grid equipment with maintenance status and overdue flags."""
-    from datetime import datetime
-
+    """Get all active grid equipment with maintenance status and overdue flags. Loads from data/equipment.json."""
     today = datetime.now().date()
-    equipment = [
-        {"id": "GEN-01", "type": "Coal Power Plant",           "capacity_mw": 1200, "maintenance_interval_days": 90,  "last_maintained": "2026-02-01"},
-        {"id": "GEN-02", "type": "Solar Farm",                 "capacity_mw": 800,  "maintenance_interval_days": 180, "last_maintained": "2026-04-01"},
-        {"id": "GEN-03", "type": "Wind Farm",                  "capacity_mw": 450,  "maintenance_interval_days": 60,  "last_maintained": "2026-03-20"},
-        {"id": "TRF-A1", "type": "Main Substation Transformer","capacity_mw": 2000, "maintenance_interval_days": 365, "last_maintained": "2025-12-01"},
-        {"id": "BATT-01","type": "Grid Battery Storage",       "capacity_mw": 150,  "maintenance_interval_days": 120, "last_maintained": "2026-01-15"},
-    ]
+    equipment = _load_equipment()
     for eq in equipment:
-        from datetime import datetime as dt
-        last = dt.strptime(eq["last_maintained"], "%Y-%m-%d").date()
+        last = datetime.strptime(eq["last_maintained"], "%Y-%m-%d").date()
         days_since = (today - last).days
         eq["days_since_last_maintenance"] = days_since
         eq["overdue"] = days_since > eq["maintenance_interval_days"]
         eq["status"] = "needs_maintenance" if eq["overdue"] else "active"
-    return json.dumps({"status": "success", "equipment": equipment})
+    return json.dumps({"status": "success", "equipment": equipment, "source": "data/equipment.json"})
 
 @mcp.tool()
 def find_optimal_maintenance_window(equipment_id: str, duration_hours: int = 4) -> str:
@@ -141,12 +148,10 @@ def find_optimal_maintenance_window(equipment_id: str, duration_hours: int = 4) 
     try:
         from datetime import datetime, timedelta
 
+        # Build registry dynamically from the same JSON source
         EQUIPMENT_REGISTRY = {
-            "GEN-01": {"capacity_mw": 1200, "type": "Coal Power Plant"},
-            "GEN-02": {"capacity_mw": 800,  "type": "Solar Farm"},
-            "GEN-03": {"capacity_mw": 450,  "type": "Wind Farm"},
-            "TRF-A1": {"capacity_mw": 2000, "type": "Main Substation Transformer"},
-            "BATT-01": {"capacity_mw": 150,  "type": "Grid Battery Storage"},
+            eq["id"]: {"capacity_mw": eq["capacity_mw"], "type": eq["type"]}
+            for eq in _load_equipment()
         }
 
         if equipment_id not in EQUIPMENT_REGISTRY:

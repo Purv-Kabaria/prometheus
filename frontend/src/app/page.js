@@ -6,38 +6,70 @@ import Card from '../components/Card';
 import ProposalCard from '../components/agent/ProposalCard';
 import FeedbackModal from '../components/agent/FeedbackModal';
 
-const API_BASE = 'http://localhost:8000/api/agent';
+const API_BASE    = 'http://localhost:8000/api/agent';
+const FORECAST_API = 'http://localhost:8000/api/forecast/24h';
+const GEN_API      = 'http://localhost:8000/api/live-comparison/generation';
+const SUMMARY_API  = 'http://localhost:8000/api/reports/today-summary';
 
 export default function GridOfficerDashboard() {
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [agentJobId, setAgentJobId]     = useState(null);
   const [modalState, setModalState] = useState({ isOpen: false, proposal: null, mode: null });
   const [userPrompt, setUserPrompt] = useState('');
   const [agentResponse, setAgentResponse] = useState(null);
-  const [telemetry, setTelemetry] = useState({ demand: null, generation: null });
+  const [telemetry, setTelemetry] = useState({
+    demand: null, generation: null, reservePct: null, gridAlert: 'normal',
+    accuracy: null, bestModel: null, anomalies: null,
+    frequency: '49.99', reserveMarginPct: null,
+  });
 
   const fetchProposals = async () => {
     try {
       const res = await fetch(`${API_BASE}/proposals`);
       const data = await res.json();
       setProposals(data.proposals || []);
-    } catch (err) {
-      console.error("Failed to fetch proposals.", err);
-    }
+    } catch (err) { console.error("Failed to fetch proposals.", err); }
   };
 
   const fetchTelemetry = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/forecast/24h');
-      const data = await res.json();
-      const currentHour = new Date().getHours();
-      const currentSlot = data.slots?.[currentHour];
-      const peakMw = data.summary?.peak_mw;
-      if (currentSlot) {
-        setTelemetry({
-          demand: currentSlot.p50,
-          generation: peakMw ? Math.round(peakMw * 1.10) : null
-        });
+      const [forecastRes, genRes, summaryRes] = await Promise.allSettled([
+        fetch(FORECAST_API),
+        fetch(GEN_API),
+        fetch(SUMMARY_API),
+      ]);
+
+      // Demand from forecast
+      if (forecastRes.status === 'fulfilled' && forecastRes.value.ok) {
+        const data = await forecastRes.value.json();
+        const currentHour = new Date().getHours();
+        const currentSlot = data.slots?.[currentHour];
+        if (currentSlot) {
+          setTelemetry(prev => ({ ...prev, demand: currentSlot.p50 }));
+        }
+      }
+
+      // Generation from live-comparison/generation endpoint
+      if (genRes.status === 'fulfilled' && genRes.value.ok) {
+        const gData = await genRes.value.json();
+        setTelemetry(prev => ({
+          ...prev,
+          generation:       gData.total_generation_mw,
+          reserveMarginPct: gData.reserve_margin_pct,
+          gridAlert:        gData.grid_alert,
+        }));
+      }
+
+      // Accuracy + best model from today-summary
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
+        const sData = await summaryRes.value.json();
+        setTelemetry(prev => ({
+          ...prev,
+          accuracy:   sData.accuracy,
+          bestModel:  sData.best_model,
+          anomalies:  sData.anomalies,
+        }));
       }
     } catch (err) { /* silently fail */ }
   };
@@ -45,9 +77,10 @@ export default function GridOfficerDashboard() {
   useEffect(() => {
     fetchProposals();
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 60000); // refresh every minute
+    const interval = setInterval(fetchTelemetry, 60000);
     return () => clearInterval(interval);
   }, []);
+
 
   const triggerAgent = async () => {
     setLoading(true);
@@ -59,9 +92,19 @@ export default function GridOfficerDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await res.json();
-      if (data.details?.final_response) {
-        setAgentResponse(data.details.final_response);
+      const { job_id } = await res.json();
+
+      // Poll for completion (max 90s, every 2.5s)
+      for (let i = 0; i < 36; i++) {
+        await new Promise(r => setTimeout(r, 2500));
+        const statusRes = await fetch(`${API_BASE}/status/${job_id}`);
+        const statusData = await statusRes.json();
+        if (statusData.status === 'done' || statusData.status === 'error') {
+          if (statusData.details?.final_response) {
+            setAgentResponse(statusData.details.final_response);
+          }
+          break;
+        }
       }
       await fetchProposals();
     } catch (err) {
@@ -160,9 +203,9 @@ export default function GridOfficerDashboard() {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "48px" }}>
-        <Card title="Current Generation" value={telemetry.generation ? `${telemetry.generation.toLocaleString()} MW` : "5,000 MW"} subtext="84% capacity utilization" accentColor="var(--primary)" />
-        <Card title="System Demand" value={telemetry.demand ? `${telemetry.demand.toLocaleString()} MW` : "4,200 MW"} subtext="Nominal operating range" accentColor="var(--success)" />
-        <Card title="Forecast Accuracy" value="98.4%" subtext="Last 24h rolling average" accentColor="var(--primary)" />
+        <Card title="Current Generation" value={telemetry.generation ? `${telemetry.generation.toLocaleString()} MW` : "—"} subtext={telemetry.reserveMarginPct !== null ? `${telemetry.reserveMarginPct}% reserve margin` : 'Loading...'} accentColor="var(--primary)" />
+        <Card title="System Demand" value={telemetry.demand ? `${Math.round(telemetry.demand).toLocaleString()} MW` : "—"} subtext={telemetry.gridAlert === 'supply_risk' ? '⚠ Supply risk detected' : 'Nominal operating range'} accentColor={telemetry.gridAlert === 'supply_risk' ? 'var(--danger)' : 'var(--success)'} />
+        <Card title="Forecast Accuracy" value={telemetry.accuracy !== null ? `${telemetry.accuracy}%` : "—"} subtext={telemetry.bestModel ? `Best: ${telemetry.bestModel}` : 'Last 24h rolling avg'} accentColor="var(--primary)" />
       </div>
 
       <main style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "48px", alignItems: "start" }}>

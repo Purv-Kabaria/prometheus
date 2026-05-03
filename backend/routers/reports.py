@@ -421,7 +421,10 @@ def generate_report(start: str = None, end: str = None):
     if start and end:
         title = "HISTORICAL INTELLIGENCE REPORT"
         subtitle = f"{start} to {end}"
-        filename = f"hist_report_{start}_{end}_{now.strftime('%H%M%S')}.pdf"
+        # Sanitize: colons are illegal on Windows NTFS — replace with hyphens
+        safe_start = start.replace(":", "-").replace("T", "_")
+        safe_end   = end.replace(":", "-").replace("T", "_")
+        filename = f"hist_report_{safe_start}_{safe_end}_{now.strftime('%H%M%S')}.pdf"
     else:
         title = "DAILY OPERATIONS REPORT"
         subtitle = datetime.now().strftime("%B %d, %Y")
