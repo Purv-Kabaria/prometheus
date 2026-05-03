@@ -9,6 +9,12 @@ import {
 import Card from "@/components/Card";
 
 const API = "http://localhost:8000";
+const REALIZED_TARIFF_DEFAULT = 3.09; // INR per kWh
+const OPEX_PER_UNIT = 0.45; // INR per kWh
+const CARBON_CREDIT_RATE = 0.20; // INR per kWh
+const DISTRIBUTION_LOSS_FACTOR = 0.0529; // 5.29%
+const AVAILABILITY_TARGET = 99.6;
+const NOTIONAL_REVENUE_COLOR = "#0ea5e9";
 
 // ─── Model Selector Component ───────────────────────────────────────────────────
 function ModelSelector({ models, activeModel, onChange, loading }) {
@@ -55,6 +61,8 @@ function StatusBadge({ status }) {
     warning: "var(--warning)", 
     critical: "var(--danger)", 
     stable: "var(--success)", 
+    incentive: "var(--success)",
+    at_risk: "var(--danger)",
     drifting: "var(--danger)", 
     unknown: "var(--muted)" 
   };
@@ -111,7 +119,13 @@ const CustomTooltip = ({ active, payload, label }) => {
       {payload.map((p, i) => (
         <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "20px", marginBottom: "4px" }}>
           <span style={{ color: p.color }}>{p.name}</span>
-          <span style={{ fontWeight: "600", color: "var(--foreground)" }}>{fmt(p.value)} MWh</span>
+          <span style={{ fontWeight: "600", color: "var(--foreground)" }}>
+            {p.dataKey === "notional_revenue_cr" ? (
+              <span style={{ color: NOTIONAL_REVENUE_COLOR }}>₹{Number(p.value).toFixed(2)} Cr</span>
+            ) : (
+              `${fmt(p.value)} MWh`
+            )}
+          </span>
         </div>
       ))}
     </div>
@@ -131,6 +145,27 @@ export default function ReportingPage() {
   // Model State
   const [activeModel, setActiveModel] = useState("default");
   const [models, setModels] = useState([]);
+
+  const totalMWh = historyData.reduce((sum, row) => sum + (Number(row.actual) || 0), 0);
+  const billedMWh = totalMWh * (1 - DISTRIBUTION_LOSS_FACTOR);
+  const grossRevenueINR = totalMWh * 1000 * REALIZED_TARIFF_DEFAULT;
+  const opexINR = totalMWh * 1000 * OPEX_PER_UNIT;
+  const ebitdaINR = grossRevenueINR - opexINR;
+  const carbonCreditINR = billedMWh * 1000 * CARBON_CREDIT_RATE;
+  const realizedRevenueCr = grossRevenueINR / 1e7;
+  const ebitdaMarginPct = grossRevenueINR > 0 ? (ebitdaINR / grossRevenueINR) * 100 : 0;
+  const transmissionAvailability = 99.6;
+  const realizedTariffObserved = billedMWh > 0 ? grossRevenueINR / (billedMWh * 1000) : REALIZED_TARIFF_DEFAULT;
+  const tariffDriftPct = ((realizedTariffObserved - REALIZED_TARIFF_DEFAULT) / REALIZED_TARIFF_DEFAULT) * 100;
+  const tariffStatus = Math.abs(tariffDriftPct) > 5 ? "drifting" : "stable";
+
+  const chartData = historyData.map((row) => {
+    const actual = Number(row.actual) || 0;
+    return {
+      ...row,
+      notional_revenue_cr: (actual * 1000 * REALIZED_TARIFF_DEFAULT) / 1e7,
+    };
+  });
 
   useEffect(() => {
     fetch(`${API}/api/forecast/models`)
@@ -223,6 +258,33 @@ export default function ReportingPage() {
         loading={loading} 
       />
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "36px" }}>
+        <MetricCard
+          label="Realized Revenue"
+          value={realizedRevenueCr.toFixed(2)}
+          unit="₹ Cr"
+          window="Selected history window"
+          status={tariffStatus}
+          target={`₹${REALIZED_TARIFF_DEFAULT.toFixed(2)}/kWh`}
+        />
+        <MetricCard
+          label="Unit EBITDA Margin"
+          value={ebitdaMarginPct.toFixed(1)}
+          unit="%"
+          window="Gross Revenue - OpEx"
+          status={ebitdaMarginPct >= 91 ? "incentive" : "warning"}
+          target="91%"
+        />
+        <MetricCard
+          label="Transmission Availability"
+          value={transmissionAvailability.toFixed(1)}
+          unit="%"
+          window="Institutional benchmark"
+          status={transmissionAvailability >= AVAILABILITY_TARGET ? "incentive" : "warning"}
+          target="99.6%"
+        />
+      </div>
+
 
       {/* Main Intelligence Chart */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "32px", marginBottom: "48px" }}>
@@ -246,7 +308,7 @@ export default function ReportingPage() {
 
         <div style={{ height: 420 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={historyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 5, right: 24, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="var(--success)" stopOpacity={0.1}/>
@@ -265,16 +327,41 @@ export default function ReportingPage() {
                 tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} 
                 interval="preserveStartEnd" minTickGap={40}
               />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} tickFormatter={fmt} />
+              <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} tickFormatter={fmt} />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: NOTIONAL_REVENUE_COLOR, fontSize: 10 }}
+                tickFormatter={(v) => `${Number(v).toFixed(2)}Cr`}
+              />
               <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={40} align="right" iconType="circle" />
+              <Legend
+                verticalAlign="top"
+                height={40}
+                align="right"
+                iconType="circle"
+                formatter={(value, entry) => (
+                  <span style={{ color: entry?.dataKey === "notional_revenue_cr" ? NOTIONAL_REVENUE_COLOR : "var(--foreground)" }}>
+                    {value}
+                  </span>
+                )}
+              />
               
-              <Area type="monotone" dataKey="actual" stroke="var(--success)" strokeWidth={2} fill="url(#gradActual)" name="Actual demand" dot={false} />
-              <Line type="monotone" dataKey="predicted_p50" stroke="var(--warning)" strokeWidth={2} strokeDasharray="4 4" dot={false} name={`${activeModel === "default" ? "System" : activeModel} prediction`} />
+              <Area yAxisId="left" type="monotone" dataKey="actual" stroke="var(--success)" strokeWidth={2} fill="url(#gradActual)" name="Actual demand" dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="predicted_p50" stroke="var(--warning)" strokeWidth={2} strokeDasharray="4 4" dot={false} name={`${activeModel === "default" ? "System" : activeModel} prediction`} />
+              <Line yAxisId="right" type="monotone" dataKey="notional_revenue_cr" stroke={NOTIONAL_REVENUE_COLOR} strokeWidth={2} dot={false} name="Notional Revenue (₹ Cr)" />
 
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "40px" }}>
+        <Card title="Net Energy Billed" value={`${billedMWh.toFixed(1)} MWh`} subtext={`Loss-adjusted using ${(DISTRIBUTION_LOSS_FACTOR * 100).toFixed(2)}% factor`} accentColor="var(--primary)" />
+        <Card title="Operational Profit (EBITDA)" value={`₹${(ebitdaINR / 1e7).toFixed(2)} Cr`} subtext={`Opex baseline ₹${OPEX_PER_UNIT.toFixed(2)}/kWh`} accentColor="var(--success)" />
+        <Card title="Carbon Credit Potential" value={`₹${(carbonCreditINR / 1e7).toFixed(2)} Cr`} subtext={`Rate ₹${CARBON_CREDIT_RATE.toFixed(2)}/kWh renewable mix`} accentColor="var(--warning)" />
       </div>
 
       {/* Reports Archive */}
@@ -326,4 +413,3 @@ export default function ReportingPage() {
     </div>
   );
 }
-

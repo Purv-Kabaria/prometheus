@@ -339,8 +339,10 @@ def _predict_lgbm(hour: int, weekday: int) -> Tuple[float, float, float]:
         p90 = max(p50, min(26_000, p90))
         return round(p10, 1), round(p50, 1), round(p90, 1)
     except Exception as exc:
+        MODEL_STATUS["lgbm"]["error"] = str(exc)
         logger.warning(f"LightGBM predict failed: {exc}, falling back to synthetic")
         return _predict_synthetic(hour, weekday)
+
 
 
 def _predict_tcn_xgb(hour: int, weekday: int) -> Tuple[float, float, float]:
@@ -369,8 +371,10 @@ def _predict_tcn_xgb(hour: int, weekday: int) -> Tuple[float, float, float]:
         p90 = round(p50 * 1.05, 1)
         return p10, round(p50, 1), p90
     except Exception as exc:
+        MODEL_STATUS["tcn_xgb"]["error"] = str(exc)
         logger.warning(f"TCN+XGB predict failed: {exc}, falling back to synthetic")
         return _predict_synthetic(hour, weekday)
+
 
 
 def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, float, float]:
@@ -404,8 +408,10 @@ def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
         p90 = round(p50 * 1.05, 1)
         return p10, round(p50, 1), p90
     except Exception as exc:
+        MODEL_STATUS[model_key]["error"] = str(exc)
         logger.warning(f"{model_key} predict failed: {exc}, falling back to synthetic")
         return _predict_synthetic(hour, weekday)
+
 
 
 def get_model_registry() -> list:
