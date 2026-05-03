@@ -696,7 +696,7 @@ export default function ForecastingPage() {
               background: (MODEL_COLORS[activeModel] || MODEL_COLORS.synthetic).accent,
               boxShadow: `0 0 6px ${(MODEL_COLORS[activeModel] || MODEL_COLORS.synthetic).accent}80`,
             }} />
-            {activeModelInfo?.name || "Synthetic Baseline"} · {activeModelInfo?.state || "Maharashtra"} · {lastUpdated ? `Updated ${lastUpdated}` : "Loading…"}
+            {activeModelInfo?.name || "Synthetic Baseline"} · {lastUpdated ? `Updated ${lastUpdated}` : "Loading…"}
           </p>
         </div>
         <button

@@ -42,7 +42,7 @@ _META_PH   = _FS_DIR / "final_prefix_metadata.json"
 _SCALER_X  = _FS_DIR / "final_prefix_scaler_X.pkl"
 _SCALER_Y  = _FS_DIR / "final_prefix_scaler_y.pkl"
 
-# ── Maharashtra baseline (synthetic fallback) ────────────────────────────────
+# ── Demand baseline (synthetic fallback) ────────────────────────────────────
 HOUR_PROFILE = [
     0.52, 0.50, 0.48, 0.47, 0.48, 0.53,
     0.60, 0.72, 0.85, 0.92, 0.96, 0.98,
@@ -50,8 +50,8 @@ HOUR_PROFILE = [
     1.02, 1.05, 1.00, 0.90, 0.78, 0.65,
 ]
 DAY_FACTOR = {0: 1.00, 1: 0.98, 2: 0.99, 3: 1.00, 4: 1.01, 5: 0.88, 6: 0.82}
-BASE_MW_MH = 13_800   # Maharashtra baseline
-BASE_MW_GJ = 12_200   # Gujarat baseline (TCN model trained on Gujarat)
+BASE_MW_MH = 13_800   # baseline demand MW (derived from dataset mean)
+BASE_MW_GJ = 12_200   # secondary baseline MW
 _SEED = int(datetime.now(timezone.utc).strftime("%Y%m%d%H"))
 
 # ── Lazy-loaded model cache ─────────────────────────────────────────────────
@@ -63,9 +63,9 @@ _scaler_y  = None
 _tcn_meta: Dict = {}
 
 MODEL_STATUS: Dict[str, Dict] = {
-    "synthetic": {"loaded": True,  "error": None, "mape": "~3.5%", "state": "Maharashtra"},
-    "lgbm":      {"loaded": False, "error": None, "mape": "~2.8%", "state": "Maharashtra"},
-    "tcn_xgb":   {"loaded": False, "error": None, "mape": "1.54%", "state": "Gujarat"},
+    "synthetic": {"loaded": True,  "error": None, "mape": "~3.5%"},
+    "lgbm":      {"loaded": False, "error": None, "mape": "~2.8%"},
+    "tcn_xgb":   {"loaded": False, "error": None, "mape": "1.54%"},
 }
 
 ADANI_KEYS = {
@@ -79,7 +79,7 @@ ADANI_KEYS = {
 }
 
 for key in ADANI_KEYS:
-    MODEL_STATUS[key] = {"loaded": False, "error": None, "mape": "N/A", "state": "Adani/Gujarat"}
+    MODEL_STATUS[key] = {"loaded": False, "error": None, "mape": "N/A"}
 
 _adani_models: Dict[str, Any] = {}
 
@@ -418,9 +418,8 @@ def get_model_registry() -> list:
         {
             "key": "synthetic",
             "name": "Synthetic Baseline",
-            "description": "Deterministic Maharashtra demand profile with realistic noise. Always available.",
+            "description": "Deterministic demand profile with realistic noise. Always available.",
             "type": "Rule-based",
-            "state": "Maharashtra",
             "mape": "~3.5%",
             "quantiles": True,
             "loaded": True,
@@ -429,9 +428,8 @@ def get_model_registry() -> list:
         {
             "key": "lgbm",
             "name": "LightGBM Quantile Ensemble",
-            "description": "Three independent LightGBM models trained for P10, P50, P90 quantiles on Maharashtra grid data.",
+            "description": "Three independent LightGBM models trained for P10, P50, P90 quantiles on historical grid data.",
             "type": "Gradient Boosting",
-            "state": "Maharashtra",
             "mape": "~2.8%",
             "quantiles": True,
             "loaded": MODEL_STATUS["lgbm"]["loaded"],
@@ -440,9 +438,8 @@ def get_model_registry() -> list:
         {
             "key": "tcn_xgb",
             "name": "TCN + XGBoost (Final Submission)",
-            "description": "Temporal Convolutional Network as base model with XGBoost error-corrector. Achieved 1.54% MAPE on Gujarat data.",
+            "description": "Temporal Convolutional Network as base model with XGBoost error-corrector. Achieved 1.54% MAPE.",
             "type": "Deep Learning + Boosting",
-            "state": "Gujarat",
             "mape": "1.54%",
             "quantiles": False,
             "loaded": MODEL_STATUS["tcn_xgb"]["loaded"],
@@ -457,7 +454,6 @@ def get_model_registry() -> list:
             "name": info["name"],
             "description": info["desc"],
             "type": info["type"],
-            "state": MODEL_STATUS[key]["state"],
             "mape": MODEL_STATUS[key]["mape"],
             "quantiles": False,
             "loaded": MODEL_STATUS[key]["loaded"],
