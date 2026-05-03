@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import ReactMarkdown from "react-markdown";
 import Card from "@/components/Card";
 import { API_BASE } from "@/lib/api";
 
@@ -19,6 +20,17 @@ const severityColors = {
   high: "var(--danger)",
   medium: "var(--warning)",
   low: "var(--success)",
+};
+
+const MD_COMPONENTS = {
+  p: ({node, ...props}) => <p style={{ marginBottom: '10px' }} {...props} />,
+  ul: ({node, ...props}) => <ul style={{ marginLeft: '22px', marginBottom: '12px', listStyleType: 'disc' }} {...props} />,
+  ol: ({node, ...props}) => <ol style={{ marginLeft: '22px', marginBottom: '12px', listStyleType: 'decimal' }} {...props} />,
+  li: ({node, ...props}) => <li style={{ marginBottom: '6px' }} {...props} />,
+  h1: ({node, ...props}) => <h1 style={{ fontWeight: '800', fontSize: '20px', margin: '16px 0 10px 0' }} {...props} />,
+  h2: ({node, ...props}) => <h2 style={{ fontWeight: '700', fontSize: '18px', margin: '14px 0 8px 0' }} {...props} />,
+  h3: ({node, ...props}) => <h3 style={{ fontWeight: '600', fontSize: '16px', margin: '12px 0 6px 0' }} {...props} />,
+  strong: ({node, ...props}) => <strong style={{ fontWeight: 'bold' }} {...props} />
 };
 
 const sortOptions = [
@@ -57,6 +69,9 @@ export default function AnomalyPage() {
   const [explainId, setExplainId] = useState(null);
   const [explainText, setExplainText] = useState("");
   const [explainBusy, setExplainBusy] = useState(false);
+  const [chatQuery, setChatQuery] = useState("");
+  const [chatResponse, setChatResponse] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
   const [rescanBusy, setRescanBusy] = useState(false);
   const [ackBusy, setAckBusy] = useState(false);
   const [error, setError] = useState("");
@@ -185,6 +200,26 @@ export default function AnomalyPage() {
   const runExplainSelected = () => {
     if (!currentSelectedId) return;
     runExplain(currentSelectedId);
+  };
+
+  const runChat = async () => {
+    if (!currentSelectedId || !chatQuery.trim()) return;
+    setChatBusy(true);
+    setChatResponse("");
+    try {
+      const res = await fetch(`${API_BASE}/api/anomalies/${currentSelectedId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: chatQuery }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Chat failed");
+      setChatResponse(data.response || "");
+    } catch (e) {
+      setChatResponse(`**Error:** ${e.message || String(e)}`);
+    } finally {
+      setChatBusy(false);
+    }
   };
 
   const runRescan = async () => {
@@ -416,20 +451,67 @@ export default function AnomalyPage() {
           <div
             style={{
               minHeight: "200px",
-              padding: "12px",
+              padding: "16px",
               borderRadius: "8px",
               background: "var(--accent)",
-              fontSize: "13px",
-              lineHeight: 1.55,
-              whiteSpace: "pre-wrap",
+              fontSize: "14px",
+              lineHeight: 1.6,
             }}
           >
-            {explainBusy
-              ? "Calling Ollama…"
-              : explainText || selected?.explanation || "No explanation yet. Select anomaly and click Explain."}
+            {explainBusy ? (
+              "Calling Ollama…"
+            ) : explainText || selected?.explanation ? (
+              <ReactMarkdown components={MD_COMPONENTS}>
+                {explainText || selected?.explanation}
+              </ReactMarkdown>
+            ) : (
+              "No explanation yet. Select anomaly and click Explain."
+            )}
           </div>
           <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
             Scan note: {selected?.llm_scan_note || "Not generated yet"}
+          </div>
+
+          <div style={{ marginTop: "20px", borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
+            <h4 style={{ fontSize: "14px", fontWeight: "600", marginBottom: "8px" }}>Ask about this anomaly</h4>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                value={chatQuery}
+                onChange={(e) => setChatQuery(e.target.value)}
+                placeholder="E.g., What are the possible reasons for this spike?"
+                disabled={!selected || chatBusy}
+                onKeyDown={(e) => { if (e.key === "Enter") runChat(); }}
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: "6px",
+                  border: "1px solid var(--surface-border)", background: "var(--background)",
+                  color: "var(--foreground)", fontSize: "13px"
+                }}
+              />
+              <button
+                onClick={runChat}
+                disabled={!selected || chatBusy || !chatQuery.trim()}
+                style={{
+                  padding: "8px 16px", borderRadius: "6px", border: "none",
+                  background: "var(--primary)", color: "var(--primary-foreground)",
+                  fontWeight: 600, cursor: (!selected || chatBusy || !chatQuery.trim()) ? "not-allowed" : "pointer",
+                  fontSize: "13px"
+                }}
+              >
+                {chatBusy ? "Asking…" : "Ask"}
+              </button>
+            </div>
+            
+            {chatResponse && (
+              <div style={{
+                marginTop: "12px", padding: "12px", borderRadius: "8px",
+                background: "var(--accent)", fontSize: "13px", lineHeight: 1.6,
+                color: "var(--foreground)"
+              }}>
+                <ReactMarkdown components={MD_COMPONENTS}>
+                  {chatResponse}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -500,7 +582,11 @@ export default function AnomalyPage() {
               filteredAnomalies.map((a) => (
                 <tr
                   key={a.id}
-                  onClick={() => setSelectedId(a.id)}
+                  onClick={() => {
+                    setSelectedId(a.id);
+                    setChatResponse("");
+                    setChatQuery("");
+                  }}
                   style={{
                     borderTop: "1px solid var(--surface-border)",
                     background: currentSelectedId === a.id ? "var(--accent)" : "transparent",

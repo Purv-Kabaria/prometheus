@@ -98,13 +98,25 @@ def _detect_rows(
         return int(w[-1])
 
     out: List[Dict[str, Any]] = []
+    
+    merged_idx["hour"] = series_utc.dt.hour
+    lookback = 720  # 30 days
+
     for raw_t in new_ts.dropna().unique():
         pos = pos_for(raw_t)
         if pos < 0:
             continue
-        prior = values[max(0, pos - ROLLBACK) : pos]
-        if len(prior) < MIN_PRIOR:
+            
+        current_hour = merged_idx.iloc[pos]["hour"]
+        start_pos = max(0, pos - lookback)
+        
+        prior_slice = merged_idx.iloc[start_pos:pos]
+        mask = prior_slice["hour"] == current_hour
+        prior = prior_slice.loc[mask, col].astype(float).values
+        
+        if len(prior) < 3: # Need at least 3 historical days of the same hour
             continue
+            
         mean = float(np.mean(prior))
         std = float(np.std(prior)) or 1e-9
         val = float(values[pos])
@@ -130,7 +142,7 @@ def _detect_rows(
                 "kind": kind,
                 "source": "ingestion_upload",
                 "upload_filename": upload_filename,
-                "stat_method": f"rolling_{ROLLBACK}h_zscore",
+                "stat_method": "seasonal_hour_zscore",
                 "llm_scan_note": None,
                 "explanation": None,
                 "explained_at": None,
@@ -283,10 +295,17 @@ def explain_anomaly_with_llm(record: Dict[str, Any]) -> str:
         [
             (
                 "system",
-                "You explain electricity demand anomalies to Indian grid and DISCOM operators. "
-                "Be precise, cite the z-score and direction (spike vs dip). Mention plausible causes "
-                "(weather, industrial load, holiday, data glitch, meter issue) only when consistent with the numbers. "
-                "Answer in 3–5 short sentences.",
+                "You are an expert electricity grid analyst advising DISCOM operators. "
+                "Your task is to explain energy demand anomalies clearly and professionally. "
+                "Always format your response in clean, beautiful Markdown. "
+                "Use headings (###), bullet points, and bold text for emphasis. "
+                "Structure your response strictly into these three sections:\n\n"
+                "### 📊 Anomaly Summary\n"
+                "Briefly state what happened (cite the z-score, MWh delta, and whether it's a spike or dip).\n\n"
+                "### 🔍 Possible Causes\n"
+                "Provide 2-3 realistic reasons for this anomaly (e.g., extreme weather, major industrial shifts, holidays, or sensor/telemetry glitches) supported by the data.\n\n"
+                "### 🛠️ Recommended Actions\n"
+                "Suggest 2-3 concrete, actionable steps the operator should take immediately to mitigate risks or verify the data."
             ),
             (
                 "human",
@@ -315,6 +334,53 @@ def explain_anomaly_with_llm(record: Dict[str, Any]) -> str:
             "ctx": ctx or "(no neighboring rows loaded)",
         }
     )
+
+def chat_with_anomaly(record: Dict[str, Any], query: str) -> str:
+    base, model = _ollama_config()
+    ctx = neighbor_context(record["timestamp_utc"])
+    from langchain_ollama import ChatOllama
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are an expert AI grid operations assistant. "
+                "You are answering a direct question from a DISCOM operator regarding a specific energy anomaly. "
+                "Always format your response in extremely clean and structured Markdown. "
+                "Use clear headings, bullet points, and bold text for key metrics or actions. Keep paragraphs short and highly readable. "
+                "Analyze the provided context deeply, answer the operator's specific query comprehensively, and proactively suggest operational solutions, mitigations, or potential root causes."
+            ),
+            (
+                "human",
+                "Anomaly record:\n"
+                "- Time (UTC): {ts}\n"
+                "- Kind: {kind}\n"
+                "- Consumption (MWh): {mwh}\n"
+                "- Rolling baseline (MWh): {base}\n"
+                "- z-score: {z}\n"
+                "- Statistical note: {scan}\n\n"
+                "Neighboring hourly observations:\n{ctx}\n\n"
+                "User Query: {query}"
+            ),
+        ]
+    )
+    llm = ChatOllama(model=model, base_url=base, temperature=0.3)
+    chain = prompt | llm | StrOutputParser()
+    return chain.invoke(
+        {
+            "ts": record.get("timestamp_utc", ""),
+            "kind": record.get("kind", ""),
+            "mwh": record.get("consumption_mwh", ""),
+            "base": record.get("baseline_mwh", ""),
+            "z": record.get("z_score", ""),
+            "scan": record.get("llm_scan_note") or "(none)",
+            "ctx": ctx or "(no neighboring rows loaded)",
+            "query": query,
+        }
+    )
+
 
 
 def update_record(anomaly_id: str, updates: Dict[str, Any]) -> bool:

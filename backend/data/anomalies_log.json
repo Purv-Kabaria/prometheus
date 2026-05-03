@@ -66,8 +66,8 @@
     "upload_filename": "sample_upload copy 2.csv",
     "stat_method": "rolling_168h_zscore",
     "llm_scan_note": null,
-    "explanation": "This spike in electricity demand at 10:00 UTC on January 11, 2024, is highly unusual with a z-score of 4.6982, indicating it is significantly above the rolling baseline consumption. Given the context, plausible causes could include an industrial load surge or weather-related factors such as unusually cold temperatures causing increased heating demands. A data glitch or meter issue can also be considered if no immediate neighboring anomalies are observed, but this is less likely given the clear spike in demand.",
-    "explained_at": "2026-05-03T14:07:35.324132+00:00",
+    "explanation": "This spike in electricity demand is highly anomalous, with a z-score of 4.6982 indicating it is significantly above the rolling baseline consumption of 4098.6088 MWh. Given the context and neighboring hourly observations, the most plausible cause for this spike could be an industrial load surge or a sudden weather event such as heavy rain or snow that impacts transportation and manufacturing operations.",
+    "explained_at": "2026-05-03T14:20:30.455380+00:00",
     "acknowledged": true,
     "created_at": "2026-05-03T13:44:28.577525+00:00"
   }
