@@ -7,12 +7,13 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   const links = [
-    { name: "Overview", href: "/" },
-    { name: "Forecasting", href: "/forecasting" },
+    { name: "Overview",          href: "/" },
+    { name: "Forecasting",       href: "/forecasting" },
     { name: "Anomaly & Explain", href: "/anomaly" },
-    { name: "Agent Decisions", href: "/agent" },
-    { name: "Reporting", href: "/reporting" },
-    { name: "Insights & Cost", href: "/insights" },
+    { name: "Agent Decisions",   href: "/agent" },
+    { name: "Reporting",         href: "/reporting" },
+    { name: "Insights & Cost",   href: "/insights" },
+    { name: "Upload & Retrain",  href: "/upload" },
   ];
 
   return (

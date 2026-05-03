@@ -13,3 +13,10 @@ darts>=0.29.0
 arch>=6.3.0
 jupyterlab
 ipykernel
+mcp
+# --- ML Pipeline ---
+torch>=2.2.0
+xgboost>=2.0.0
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
