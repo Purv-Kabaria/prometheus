@@ -5,21 +5,21 @@ import { useState, useRef, useCallback } from 'react';
 const API_BASE = 'http://localhost:8000';
 
 const STATUS_COLOR = {
-  pending:  { bg: '#1e293b', text: '#94a3b8', dot: '#64748b' },
-  running:  { bg: '#1c2f4a', text: '#60a5fa', dot: '#3b82f6' },
-  done:     { bg: '#0f2a1e', text: '#34d399', dot: '#10b981' },
-  failed:   { bg: '#2d1515', text: '#f87171', dot: '#ef4444' },
+  pending: { bg: '#1e293b', text: '#94a3b8', dot: '#64748b' },
+  running: { bg: '#1c2f4a', text: '#60a5fa', dot: '#3b82f6' },
+  done: { bg: '#0f2a1e', text: '#34d399', dot: '#10b981' },
+  failed: { bg: '#2d1515', text: '#f87171', dot: '#ef4444' },
 };
 
 export default function UploadPage() {
-  const [file, setFile]           = useState(null);
-  const [dragging, setDragging]   = useState(false);
+  const [file, setFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result, setResult]       = useState(null);   // upload response
+  const [result, setResult] = useState(null);   // upload response
   const [jobStatus, setJobStatus] = useState(null);   // polled status
-  const [polling, setPolling]     = useState(false);
-  const [error, setError]         = useState(null);
-  const [registry, setRegistry]   = useState(null);
+  const [polling, setPolling] = useState(false);
+  const [error, setError] = useState(null);
+  const [registry, setRegistry] = useState(null);
   const fileRef = useRef();
   const pollRef = useRef(null);
 
@@ -55,7 +55,7 @@ export default function UploadPage() {
     body.append('file', file);
 
     try {
-      const res  = await fetch(`${API_BASE}/pipeline/upload`, { method: 'POST', body });
+      const res = await fetch(`${API_BASE}/pipeline/upload`, { method: 'POST', body });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Upload failed');
       setResult(data);
@@ -73,7 +73,7 @@ export default function UploadPage() {
     clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const res  = await fetch(`${API_BASE}/pipeline/status/${jobId}`);
+        const res = await fetch(`${API_BASE}/pipeline/status/${jobId}`);
         const data = await res.json();
         setJobStatus(data);
         if (data.status === 'done' || data.status === 'failed') {
@@ -101,7 +101,7 @@ export default function UploadPage() {
   // ── registry ──────────────────────────────────────────────────────────────
   const fetchRegistry = async () => {
     try {
-      const res  = await fetch(`${API_BASE}/pipeline/registry`);
+      const res = await fetch(`${API_BASE}/pipeline/registry`);
       const data = await res.json();
       setRegistry(data);
     } catch (err) {
@@ -244,11 +244,25 @@ export default function UploadPage() {
           borderRadius: 14, padding: 20, marginBottom: 20,
         }}>
           <h3 style={{ fontWeight: 600, marginBottom: 12, fontSize: 15 }}>✅ Upload Accepted</h3>
-          <Row label="File"         value={result.filename} />
-          <Row label="Rows merged"  value={result.rows_merged} />
-          <Row label="New version"  value={result.new_version} mono />
-          <Row label="Job ID"       value={result.job_id} mono small />
-          <Row label="Status"       value={result.status} />
+          <Row label="File" value={result.filename} />
+          <Row label="Rows merged" value={result.rows_merged} />
+          <Row label="New version" value={result.new_version} mono />
+          <Row label="Job ID" value={result.job_id} mono small />
+          <Row label="Status" value={result.status} />
+
+          {result.anomalies_detected > 0 && (
+            <div style={{
+              marginTop: 16, padding: '12px 16px', borderRadius: 10,
+              background: '#2d1515', border: '1px solid #7f1d1d',
+              color: '#fca5a5', fontSize: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <span>⚠️ <strong>{result.anomalies_detected} anomalies</strong> detected in uploaded data.</span>
+              <a href="/anomaly" style={{
+                background: '#fca5a5', color: '#450a0a', padding: '4px 10px',
+                borderRadius: 6, fontWeight: 600, fontSize: 12, textDecoration: 'none'
+              }}>View Anomalies</a>
+            </div>
+          )}
         </div>
       )}
 
@@ -273,11 +287,11 @@ export default function UploadPage() {
             </h3>
           </div>
 
-          <Row label="Version"    value={jobStatus.version} mono />
-          <Row label="Parent"     value={jobStatus.parent}  mono />
-          <Row label="Started"    value={fmt(jobStatus.started_at)} />
+          <Row label="Version" value={jobStatus.version} mono />
+          <Row label="Parent" value={jobStatus.parent} mono />
+          <Row label="Started" value={fmt(jobStatus.started_at)} />
           {jobStatus.finished_at && <Row label="Finished" value={fmt(jobStatus.finished_at)} />}
-          {jobStatus.pid   && <Row label="PID"    value={jobStatus.pid} mono />}
+          {jobStatus.pid && <Row label="PID" value={jobStatus.pid} mono />}
 
           {/* step progress pills */}
           {jobStatus.log_tail && (() => {

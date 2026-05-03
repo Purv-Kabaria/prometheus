@@ -18,6 +18,7 @@ from anomaly_pipeline import (
     load_gold_tail,
     run_post_ingest_anomaly_scan,
     update_record,
+    chat_with_anomaly,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,25 +74,53 @@ def explain(anomaly_id: str):
     return {"id": anomaly_id, "explanation": text}
 
 
+class ChatBody(BaseModel):
+    query: str
+
+@router.post("/{anomaly_id}/chat")
+def chat_anomaly(anomaly_id: str, body: ChatBody):
+    rec = get_record(anomaly_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Anomaly not found")
+    try:
+        text = chat_with_anomaly(rec, body.query)
+    except Exception as exc:
+        logger.exception("Chat failed")
+        raise HTTPException(
+            status_code=503,
+            detail=f"LLM unavailable: {exc}. Ensure Ollama is running with llama3.",
+        ) from exc
+    return {"id": anomaly_id, "response": text}
+
+
 @router.get("/series")
 def series(limit: int = Query(default=168, ge=24, le=2000)):
-    df = load_gold_tail(limit)
+    lookback = 720
+    df = load_gold_tail(limit + lookback)
     if df.empty:
         return {"points": []}
     col = "Electricity consumption (MWh)"
-    vals = df[col].astype(float).values
-    rolling = pd.Series(vals).rolling(24, min_periods=6).mean().values
+    df["_dt_utc"] = pd.to_datetime(df["_dt"], utc=True)
+    df["hour"] = df["_dt_utc"].dt.hour
+    
+    # Calculate seasonal baseline: mean of the same hour over the last 30 days
+    df["baseline"] = df.groupby("hour")[col].transform(lambda x: x.shift(1).rolling(window=30, min_periods=3).mean())
+    df["baseline"] = df["baseline"].fillna(df[col])
+    
+    df_tail = df.iloc[-limit:].copy()
+    
     points: List[Dict[str, Any]] = []
-    for i, row in df.iterrows():
-        ts = pd.to_datetime(row["_dt"], utc=True)
-        base = float(rolling[i]) if not np.isnan(rolling[i]) else float(row[col])
-        res = float(row[col]) - base if not np.isnan(rolling[i]) else 0.0
+    for i, row in df_tail.iterrows():
+        ts = row["_dt_utc"]
+        base = float(row["baseline"])
+        val = float(row[col])
+        res = val - base
         points.append(
             {
                 "timestamp": ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "label": ts.strftime("%m-%d %H:%M"),
-                "mwh": float(row[col]),
-                "baseline": base,
+                "mwh": val,
+                "baseline": round(base, 4),
                 "residual": round(res, 4),
             }
         )

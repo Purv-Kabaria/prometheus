@@ -40,6 +40,8 @@ async def run_mcp_agent_workflow(user_prompt: str = None):
     )
 
     ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+    if not ollama_host.startswith("http://") and not ollama_host.startswith("https://"):
+        ollama_host = "http://" + ollama_host
 
     # Fast check if Ollama daemon is running
     try:
