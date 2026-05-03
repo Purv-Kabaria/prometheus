@@ -121,20 +121,12 @@ const CustomTooltip = ({ active, payload, label }) => {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function ReportingPage() {
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState("live"); // "live" | "explorer"
   
-  // Live State
-  const [hours, setHours] = useState(24);
-  const [liveData, setLiveData] = useState([]);
-  const [liveSummary, setLiveSummary] = useState(null);
-  const [perf, setPerf] = useState(null);
-  const [todaySummary, setTodaySummary] = useState(null);
+  // State
+  const [freq, setFreq] = useState("W"); // H, D, W, M
+  const [historyData, setHistoryData] = useState([]);
   const [reports, setReports] = useState([]);
   const [generating, setGenerating] = useState(false);
-
-  // Explorer State (2016-2021)
-  const [freq, setFreq] = useState("W"); // H, D, W
-  const [historyData, setHistoryData] = useState([]);
 
   // Model State
   const [activeModel, setActiveModel] = useState("default");
@@ -149,39 +141,21 @@ export default function ReportingPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    console.log(`[Reporting] Fetching data for view=${viewMode}, model=${activeModel}, freq=${freq}`);
     try {
-      if (viewMode === "live") {
-        const [liveRes, perfRes, repsRes, sumRes] = await Promise.all([
-          fetch(`${API}/api/live-comparison?hours=${hours}&model=${activeModel}`),
-          fetch(`${API}/api/model/performance?model=${activeModel}`),
-          fetch(`${API}/api/reports`),
-          fetch(`${API}/api/reports/today-summary`),
-        ]);
+      const [histRes, repsRes] = await Promise.all([
+        fetch(`${API}/api/grid-history?freq=${freq}&limit=2000&model=${activeModel}`),
+        fetch(`${API}/api/reports`),
+      ]);
 
-        const [live, perfData, reps, sum] = await Promise.all([
-          liveRes.json(), perfRes.json(), repsRes.json(), sumRes.json(),
-        ]);
-        setLiveData(live.data || []);
-        setLiveSummary(live.summary || {});
-        setPerf(perfData);
-        setReports(reps || []);
-        setTodaySummary(sum);
-        // Clear history data to avoid stale chart if user switches
-        setHistoryData([]);
-      } else {
-        const res = await fetch(`${API}/api/grid-history?freq=${freq}&limit=2000&model=${activeModel}`);
-        const data = await res.json();
-        setHistoryData(data.data || []);
-        // Clear live data
-        setLiveData([]);
-      }
+      const [hist, reps] = await Promise.all([histRes.json(), repsRes.json()]);
+      setHistoryData(hist.data || []);
+      setReports(reps || []);
     } catch (e) {
       console.error("Fetch failed", e);
     } finally {
       setLoading(false);
     }
-  }, [hours, viewMode, freq, activeModel]);
+  }, [freq, activeModel]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -189,7 +163,7 @@ export default function ReportingPage() {
     setGenerating(true);
     try {
       let url = `${API}/api/reports/generate`;
-      if (viewMode === "explorer" && historyData.length > 0) {
+      if (historyData.length > 0) {
         const start = historyData[0].timestamp;
         const end   = historyData[historyData.length - 1].timestamp;
         url += `?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
@@ -204,10 +178,6 @@ export default function ReportingPage() {
     }
   };
 
-  const drift = perf?.drift_status;
-  const m7    = perf?.current?.["7d"]  || {};
-  const m30   = perf?.current?.["30d"] || {};
-  const m90   = perf?.current?.["90d"] || {};
 
   return (
     <div style={{ paddingBottom: "80px" }}>
@@ -216,7 +186,7 @@ export default function ReportingPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "48px" }}>
         <div>
           <h1 className="serif" style={{ fontSize: "36px", fontWeight: "400", marginBottom: "8px" }}>Operational intelligence</h1>
-          <p style={{ color: "var(--muted)", fontSize: "15px" }}>Comprehensive grid performance monitoring and historical dataset exploration</p>
+          <p style={{ color: "var(--muted)", fontSize: "15px" }}>Historical dataset exploration and institutional report generation</p>
         </div>
         <button
           onClick={handleGenerate}
@@ -232,31 +202,17 @@ export default function ReportingPage() {
       </div>
 
       {/* Mode Switcher */}
+      {/* Mode Indicator (Explorer only) */}
       <div style={{ display: "flex", gap: "24px", borderBottom: "1px solid var(--surface-border)", marginBottom: "32px" }}>
-        <button 
-          onClick={() => setViewMode("live")}
+        <div 
           style={{
-            padding: "12px 4px", fontSize: "14px", fontWeight: viewMode === "live" ? "600" : "400", 
-            cursor: "pointer", border: "none", background: "transparent",
-            color: viewMode === "live" ? "var(--foreground)" : "var(--muted)",
-            borderBottom: viewMode === "live" ? "2px solid var(--primary)" : "2px solid transparent",
-            transition: "all 0.2s"
+            padding: "12px 4px", fontSize: "14px", fontWeight: "600", 
+            color: "var(--foreground)",
+            borderBottom: "2px solid var(--primary)",
           }}
         >
-          Live operations
-        </button>
-        <button 
-          onClick={() => setViewMode("explorer")}
-          style={{
-            padding: "12px 4px", fontSize: "14px", fontWeight: viewMode === "explorer" ? "600" : "400", 
-            cursor: "pointer", border: "none", background: "transparent",
-            color: viewMode === "explorer" ? "var(--foreground)" : "var(--muted)",
-            borderBottom: viewMode === "explorer" ? "2px solid var(--primary)" : "2px solid transparent",
-            transition: "all 0.2s"
-          }}
-        >
-          Dataset explorer (2016-2021)
-        </button>
+          Historical Intelligence Explorer
+        </div>
       </div>
 
       {/* Model Selection */}
@@ -267,52 +223,30 @@ export default function ReportingPage() {
         loading={loading} 
       />
 
-      {/* Metrics Row (Only in Live Mode) */}
-      {viewMode === "live" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px", marginBottom: "48px" }}>
-          <MetricCard label="MAE" value={m7.mae ?? "–"} unit="MWh" window="7-day avg" status={drift} target="3.0" />
-          <MetricCard label="RMSE" value={m30.rmse ?? "–"} unit="MWh" window="30-day avg" status={drift} target="4.0" />
-          <MetricCard label="MAPE" value={m90.mape ?? "–"} unit="%" window="90-day avg" status={drift} target="5%" />
-          <MetricCard label="Drift status" value={drift?.toUpperCase() ?? "STABLE"} unit="" window="System health" status={drift} />
-        </div>
-      )}
 
       {/* Main Intelligence Chart */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "32px", marginBottom: "48px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
           <h3 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-            {viewMode === "live" ? "Operational Timeline" : "Historical Intelligence Matrix"}
+            Trend Visualization Matrix
           </h3>
           <div style={{ display: "flex", gap: "12px" }}>
-            {viewMode === "live" ? (
-              [24, 72, 168].map(h => (
-                <button key={h} onClick={() => setHours(h)} style={{
-                  padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", 
-                  border: "1px solid var(--surface-border)",
-                  background: hours === h ? "var(--accent)" : "var(--surface)", 
-                  color: hours === h ? "var(--primary)" : "var(--muted)"
-                }}>
-                  {h === 168 ? "7D" : `${h}H`}
-                </button>
-              ))
-            ) : (
-              ["H", "D", "W", "M"].map(f => (
-                <button key={f} onClick={() => setFreq(f)} style={{
-                  padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", 
-                  border: "1px solid var(--surface-border)",
-                  background: freq === f ? "var(--accent)" : "var(--surface)", 
-                  color: freq === f ? "var(--primary)" : "var(--muted)"
-                }}>
-                  {f === "H" ? "Hourly" : f === "D" ? "Daily" : f === "W" ? "Weekly" : "Monthly"}
-                </button>
-              ))
-            )}
+            {["H", "D", "W", "M"].map(f => (
+              <button key={f} onClick={() => setFreq(f)} style={{
+                padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", 
+                border: "1px solid var(--surface-border)",
+                background: freq === f ? "var(--accent)" : "var(--surface)", 
+                color: freq === f ? "var(--primary)" : "var(--muted)"
+              }}>
+                {f === "H" ? "Hourly" : f === "D" ? "Daily" : f === "W" ? "Weekly" : "Monthly"}
+              </button>
+            ))}
           </div>
         </div>
 
         <div style={{ height: 420 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={viewMode === "live" ? liveData : historyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <ComposedChart data={historyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="var(--success)" stopOpacity={0.1}/>
@@ -324,7 +258,7 @@ export default function ReportingPage() {
                 dataKey="timestamp" 
                 tickFormatter={(ts) => {
                   const d = new Date(ts);
-                  if (viewMode === "explorer" && freq !== "H") return `${d.getFullYear()}/${d.getMonth()+1}`;
+                  if (freq !== "H") return `${d.getFullYear()}/${d.getMonth()+1}`;
                   return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`;
                 }} 
                 axisLine={false}

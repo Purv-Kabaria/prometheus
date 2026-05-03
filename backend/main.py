@@ -39,7 +39,7 @@ logging.getLogger("uvicorn.access").addFilter(_SuppressStatusPoll())
 
 app = FastAPI(
     title="Prometheus Grid API",
-    description="ML Pipeline & Operational Intelligence for Maharashtra Grid Officers",
+    description="ML Pipeline & Operational Intelligence for Grid Operators",
     version="2.1.0",
 )
 

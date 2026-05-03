@@ -48,7 +48,6 @@ def list_models():
 
 @router.get("/24h")
 def forecast_24h(
-    state: str = "Maharashtra",
     model: str = Query(default="synthetic", description="Model key: synthetic | lgbm | tcn_xgb"),
 ):
     """
@@ -112,7 +111,6 @@ def forecast_24h(
     avg_conf    = round(sum(s["confidence"] for s in slots) / len(slots) * 100, 1)
 
     return {
-        "state":         state,
         "model":         model,
         "generated_at":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "horizon_hours": 24,
@@ -132,7 +130,6 @@ def forecast_24h(
 
 @router.get("/7day")
 def forecast_7day(
-    state: str = "Maharashtra",
     model: str = Query(default="synthetic"),
 ):
     """Rolling 7-day daily demand forecast."""
@@ -189,7 +186,6 @@ def forecast_7day(
     best_maint = max(days, key=lambda d: d["maintenance_score"])
 
     return {
-        "state":         state,
         "model":         model,
         "generated_at":  now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "horizon_days":  7,
@@ -284,7 +280,6 @@ def forecast_30day(
 
 @router.get("/peak-hours")
 def forecast_peak_hours(
-    state: str = "Maharashtra",
     days:  int = Query(default=1, ge=1, le=7),
     model: str = Query(default="synthetic"),
 ):
@@ -332,7 +327,6 @@ def forecast_peak_hours(
         })
 
     return {
-        "state":        state,
         "model":        model,
         "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "days":         results,
@@ -343,7 +337,6 @@ def forecast_peak_hours(
 
 @router.get("/offpeak")
 def forecast_offpeak(
-    state: str = "Maharashtra",
     model: str = Query(default="synthetic"),
 ):
     """Identifies today's low-demand windows for curtailment / battery charging."""
@@ -412,7 +405,6 @@ def forecast_offpeak(
     total_saving = sum(w["saving_est_mw"] for w in windows)
 
     return {
-        "state":               state,
         "model":               model,
         "date":                today.strftime("%Y-%m-%d"),
         "generated_at":        now.strftime("%Y-%m-%dT%H:%M:%SZ"),

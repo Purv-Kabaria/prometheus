@@ -1,0 +1,254 @@
+[
+  {
+    "id": 1,
+    "file": "/forecasting-models/viz_01.png",
+    "cell": 4,
+    "output_index": 0,
+    "title_guess": "Before Outlier Treatment: Consumption Distribution"
+  },
+  {
+    "id": 2,
+    "file": "/forecasting-models/viz_02.png",
+    "cell": 4,
+    "output_index": 2,
+    "title_guess": "Before Outlier Treatment: Consumption Distribution"
+  },
+  {
+    "id": 3,
+    "file": "/forecasting-models/viz_03.png",
+    "cell": 7,
+    "output_index": 0,
+    "title_guess": "Time Series Decomposition (2-Week Slice)"
+  },
+  {
+    "id": 4,
+    "file": "/forecasting-models/viz_04.png",
+    "cell": 8,
+    "output_index": 0,
+    "title_guess": "Autocorrelation Function (ACF) - Identifies Long-Term Seasonality"
+  },
+  {
+    "id": 5,
+    "file": "/forecasting-models/viz_05.png",
+    "cell": 9,
+    "output_index": 0,
+    "title_guess": "Feature Correlation Heatmap (Target vs. Engineered Features)"
+  },
+  {
+    "id": 6,
+    "file": "/forecasting-models/viz_06.png",
+    "cell": 10,
+    "output_index": 0,
+    "title_guess": "Daily Average Consumption (Smoothing out hourly noise)"
+  },
+  {
+    "id": 7,
+    "file": "/forecasting-models/viz_07.png",
+    "cell": 11,
+    "output_index": 0,
+    "title_guess": "Periodogram: Mathematical Proof of Seasonality"
+  },
+  {
+    "id": 8,
+    "file": "/forecasting-models/viz_08.png",
+    "cell": 12,
+    "output_index": 0,
+    "title_guess": "Target vs. Lag 1 (1 Hour Ago)"
+  },
+  {
+    "id": 9,
+    "file": "/forecasting-models/viz_09.png",
+    "cell": 13,
+    "output_index": 0,
+    "title_guess": "Energy Consumption: Off-Peak vs. Business Hours"
+  },
+  {
+    "id": 10,
+    "file": "/forecasting-models/viz_10.png",
+    "cell": 14,
+    "output_index": 0,
+    "title_guess": "Monthly Distribution Shifts (Volatility Analysis)"
+  },
+  {
+    "id": 11,
+    "file": "/forecasting-models/viz_11.png",
+    "cell": 19,
+    "output_index": 0,
+    "title_guess": "Feature Importance (Gain) - What drives the predictions?"
+  },
+  {
+    "id": 12,
+    "file": "/forecasting-models/viz_12.png",
+    "cell": 23,
+    "output_index": 1,
+    "title_guess": "Ultimate Model: 24-Hour Recursive Future Forecast"
+  },
+  {
+    "id": 13,
+    "file": "/forecasting-models/viz_13.png",
+    "cell": 25,
+    "output_index": 1,
+    "title_guess": "1-Month Ahead Forecast (720 Hours) - Prophet Model"
+  },
+  {
+    "id": 14,
+    "file": "/forecasting-models/viz_14.png",
+    "cell": 25,
+    "output_index": 2,
+    "title_guess": "1-Month Ahead Forecast (720 Hours) - Prophet Model"
+  },
+  {
+    "id": 15,
+    "file": "/forecasting-models/viz_15.png",
+    "cell": 26,
+    "output_index": 2,
+    "title_guess": "Cross-Validation Technique Comparison (Lower is Better)"
+  },
+  {
+    "id": 16,
+    "file": "/forecasting-models/viz_16.png",
+    "cell": 27,
+    "output_index": 2,
+    "title_guess": "MAPE Comparison"
+  },
+  {
+    "id": 17,
+    "file": "/forecasting-models/viz_17.png",
+    "cell": 28,
+    "output_index": 2,
+    "title_guess": "Forecast Degradation Over Time (Error vs Horizon)"
+  },
+  {
+    "id": 18,
+    "file": "/forecasting-models/viz_18.png",
+    "cell": 29,
+    "output_index": 1,
+    "title_guess": "SHAP Summary Plot: Feature Impact on Predictions"
+  },
+  {
+    "id": 19,
+    "file": "/forecasting-models/viz_19.png",
+    "cell": 29,
+    "output_index": 2,
+    "title_guess": "SHAP Summary Plot: Feature Impact on Predictions"
+  },
+  {
+    "id": 20,
+    "file": "/forecasting-models/viz_20.png",
+    "cell": 29,
+    "output_index": 3,
+    "title_guess": "SHAP Summary Plot: Feature Impact on Predictions"
+  },
+  {
+    "id": 21,
+    "file": "/forecasting-models/viz_21.png",
+    "cell": 29,
+    "output_index": 4,
+    "title_guess": "SHAP Summary Plot: Feature Impact on Predictions"
+  },
+  {
+    "id": 22,
+    "file": "/forecasting-models/viz_22.png",
+    "cell": 33,
+    "output_index": 1,
+    "title_guess": "XGBoost: 2-Week Holdout Forecast"
+  },
+  {
+    "id": 23,
+    "file": "/forecasting-models/viz_23.png",
+    "cell": 36,
+    "output_index": 1,
+    "title_guess": "CatBoost: 2-Week Holdout Forecast"
+  },
+  {
+    "id": 24,
+    "file": "/forecasting-models/viz_24.png",
+    "cell": 39,
+    "output_index": 1,
+    "title_guess": "LightGBM: 2-Week Holdout Forecast"
+  },
+  {
+    "id": 25,
+    "file": "/forecasting-models/viz_25.png",
+    "cell": 42,
+    "output_index": 1,
+    "title_guess": "Prophet: 2-Week Holdout Forecast"
+  },
+  {
+    "id": 26,
+    "file": "/forecasting-models/viz_26.png",
+    "cell": 44,
+    "output_index": 0,
+    "title_guess": "MAPE Comparison (Lower is Better)"
+  },
+  {
+    "id": 27,
+    "file": "/forecasting-models/viz_27.png",
+    "cell": 45,
+    "output_index": 0,
+    "title_guess": "MAPE Comparison (Lower is Better)"
+  },
+  {
+    "id": 28,
+    "file": "/forecasting-models/viz_28.png",
+    "cell": 46,
+    "output_index": 2,
+    "title_guess": "Forecast Degradation: Short-Term vs Long-Term Models"
+  },
+  {
+    "id": 29,
+    "file": "/forecasting-models/viz_29.png",
+    "cell": 47,
+    "output_index": 1,
+    "title_guess": "SHAP Summary Plot ({best_model_name})"
+  },
+  {
+    "id": 30,
+    "file": "/forecasting-models/viz_30.png",
+    "cell": 47,
+    "output_index": 2,
+    "title_guess": "SHAP Summary Plot ({best_model_name})"
+  },
+  {
+    "id": 31,
+    "file": "/forecasting-models/viz_31.png",
+    "cell": 49,
+    "output_index": 1,
+    "title_guess": "LightGBM Learning Curve"
+  },
+  {
+    "id": 32,
+    "file": "/forecasting-models/viz_32.png",
+    "cell": 52,
+    "output_index": 2,
+    "title_guess": "Final Model Tournament: Base Models vs. Ensembles"
+  },
+  {
+    "id": 33,
+    "file": "/forecasting-models/viz_33.png",
+    "cell": 53,
+    "output_index": 1,
+    "title_guess": "3-Day High-Fidelity Forecast Comparison"
+  },
+  {
+    "id": 34,
+    "file": "/forecasting-models/viz_34.png",
+    "cell": 70,
+    "output_index": 1,
+    "title_guess": "Spike Diagnostics: 96-Hour Window Around Maximum Test Set Peak"
+  },
+  {
+    "id": 35,
+    "file": "/forecasting-models/viz_35.png",
+    "cell": 72,
+    "output_index": 1,
+    "title_guess": "Macro Grid Analysis: The COVID-19 Demand Destruction"
+  },
+  {
+    "id": 36,
+    "file": "/forecasting-models/viz_36.png",
+    "cell": 78,
+    "output_index": 1,
+    "title_guess": "Spike Diagnostics: How Sample Weighting Fixed the Peak Under-Prediction"
+  }
+]

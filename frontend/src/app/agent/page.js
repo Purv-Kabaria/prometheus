@@ -20,7 +20,7 @@ const ActionCard = ({ id, action, rationale, time, zone, confidence, priority })
           textTransform: "uppercase", 
           padding: "4px 8px", 
           borderRadius: "4px",
-          background: priority === "critical" ? "#fef2f2" : "#fff7ed",
+          background: priority === "critical" ? "rgba(192, 57, 43, 0.1)" : "rgba(230, 126, 34, 0.1)",
           color: priority === "critical" ? "var(--danger)" : "var(--primary)"
         }}>
           {priority}
@@ -39,7 +39,7 @@ const ActionCard = ({ id, action, rationale, time, zone, confidence, priority })
             padding: "4px 10px", 
             border: "1px solid var(--surface-border)", 
             borderRadius: "4px",
-            background: "#fafafa"
+            background: "var(--accent)"
           }}>
             {tag}
           </span>
@@ -142,7 +142,7 @@ export default function AgentPage() {
         <section>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
             <h2 className="serif" style={{ fontSize: "24px", fontWeight: "400" }}>Action queue</h2>
-            <span style={{ background: "#fef2f2", color: "var(--danger)", fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px" }}>
+            <span style={{ background: "rgba(192, 57, 43, 0.1)", color: "var(--danger)", fontSize: "10px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px" }}>
               2 PENDING
             </span>
           </div>
@@ -173,8 +173,8 @@ export default function AgentPage() {
                 { l: "Overrides", v: "3" },
                 { l: "Avg latency", v: "1.2s" }
               ].map(stat => (
-                <div key={stat.l} style={{ background: "#fcfcfb", border: "1px solid var(--surface-border)", padding: "16px", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "18px", fontWeight: "400", marginBottom: "4px" }}>{stat.v}</div>
+                <div key={stat.l} style={{ background: "var(--accent)", border: "1px solid var(--surface-border)", padding: "16px", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "18px", fontWeight: "400", marginBottom: "4px", color: "var(--foreground)" }}>{stat.v}</div>
                   <div style={{ fontSize: "10px", color: "var(--muted)", textTransform: "uppercase" }}>{stat.l}</div>
                 </div>
               ))}
