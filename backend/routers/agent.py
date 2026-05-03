@@ -4,9 +4,9 @@ from typing import List, Optional
 import sys
 import os
 
-# Ensure we can import from parent dir
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mcp_server import PENDING_PROPOSALS, propose_grid_action
+from database import load_proposals, update_proposal
+from agent_client import run_mcp_agent_workflow
 
 router = APIRouter(prefix="/api/agent", tags=["Agent Decisions"])
 
@@ -17,32 +17,32 @@ class FeedbackRequest(BaseModel):
     overridden_mwh: Optional[float] = None
 
 @router.post("/trigger")
-def trigger_agent():
-    """Stub to trigger the agent manually without an LLM"""
-    # Simply call the MCP tool directly to generate a mock proposal
-    propose_grid_action(
-        action_type="curtailment",
-        target_mwh=650.0,
-        target_hour="15:00",
-        rationale="Forecast shows demand dropping by 600 MW due to high solar output. Recommending curtailment to prevent over-generation."
-    )
-    return {"status": "success", "message": "Agent triggered. Check proposals."}
+async def trigger_agent():
+    """
+    Triggers the full MCP Agent workflow.
+    The client spins up the MCP server via stdio, fetches data using tools,
+    makes a decision, and uses tools to propose the action.
+    """
+    result = await run_mcp_agent_workflow()
+    return {"status": "success", "message": "Agent triggered via MCP Protocol.", "details": result}
 
 @router.get("/proposals")
 def get_proposals():
-    """Fetch all pending proposals for the dashboard"""
-    return {"proposals": [p for p in PENDING_PROPOSALS if p["status"] == "pending_approval"]}
+    """Fetch all pending proposals from the shared JSON database"""
+    proposals = load_proposals()
+    return {"proposals": [p for p in proposals if p["status"] == "pending_approval"]}
 
 @router.post("/feedback")
 def submit_feedback(req: FeedbackRequest):
-    """Handle officer feedback"""
-    for prop in PENDING_PROPOSALS:
-        if prop["id"] == req.proposal_id:
-            prop["status"] = req.status
-            if req.reason:
-                prop["officer_reason"] = req.reason
-            if req.overridden_mwh:
-                prop["overridden_mwh"] = req.overridden_mwh
-            return {"status": "success", "message": f"Proposal {req.proposal_id} resolved as {req.status}."}
+    """Handle officer feedback and update the JSON database"""
+    updates = {"status": req.status}
+    if req.reason:
+        updates["officer_reason"] = req.reason
+    if req.overridden_mwh:
+        updates["overridden_mwh"] = req.overridden_mwh
+        
+    success = update_proposal(req.proposal_id, updates)
+    if success:
+        return {"status": "success", "message": f"Proposal {req.proposal_id} resolved as {req.status}."}
     
     raise HTTPException(status_code=404, detail="Proposal not found")
