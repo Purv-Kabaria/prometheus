@@ -277,6 +277,7 @@ export default function AnomalyPage() {
               borderRadius: "8px",
               border: "1px solid var(--surface-border)",
               background: "var(--surface)",
+              color: "var(--foreground)",
               cursor: loading ? "wait" : "pointer",
               fontWeight: "600",
               fontSize: "13px"
@@ -293,6 +294,7 @@ export default function AnomalyPage() {
               borderRadius: "8px",
               border: "1px solid var(--surface-border)",
               background: "var(--surface)",
+              color: "var(--foreground)",
               cursor: ackBusy ? "wait" : "pointer",
               fontWeight: "600",
               fontSize: "13px"
@@ -396,7 +398,7 @@ export default function AnomalyPage() {
                     />
                   ))}
                 </Bar>
-                <Line type="monotone" dataKey="mwh" name="MWh" stroke="var(--primary)" strokeWidth={2} dot={false} opacity={0.3} />
+                <Line type="monotone" dataKey="mwh" name="MWh" stroke="var(--success)" strokeWidth={2} dot={false} opacity={0.3} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
@@ -410,9 +412,9 @@ export default function AnomalyPage() {
             
             <div style={{ marginBottom: "20px", display: "grid", gap: "8px" }}>
               <div style={{ fontSize: "10px", color: "var(--muted)", textTransform: "uppercase" }}>Selected Event</div>
-              <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: "600" }}>{selected?.id?.slice(0, 8) || "—"}</div>
+              <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: "600", color: "var(--foreground)" }}>{selected?.id?.slice(0, 8) || "—"}</div>
               <div style={{ fontSize: "10px", color: "var(--muted)", textTransform: "uppercase" }}>Timestamp</div>
-              <div style={{ fontSize: "12px" }}>{formatUtc(selected?.timestamp_utc)}</div>
+              <div style={{ fontSize: "12px", color: "var(--foreground)" }}>{formatUtc(selected?.timestamp_utc)}</div>
             </div>
 
             <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
@@ -443,6 +445,7 @@ export default function AnomalyPage() {
                   borderRadius: "6px",
                   border: "1px solid var(--surface-border)",
                   background: "var(--surface)",
+                  color: "var(--foreground)",
                   fontWeight: 700,
                   fontSize: "11px",
                   textTransform: "uppercase",
