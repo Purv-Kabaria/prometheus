@@ -29,6 +29,7 @@ torchvision
 torchaudio
 tqdm>=4.66.0
 lightgbm
+catboost
 xgboost>=2.0.0
 joblib
 ollama>=0.3.0

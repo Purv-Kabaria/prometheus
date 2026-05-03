@@ -4,10 +4,24 @@ import { useState, useEffect, useCallback } from "react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
-  Cell
+  Cell, Legend
 } from "recharts";
 
 const API = "http://localhost:8000/api/forecast";
+
+// ─── Model type colors ────────────────────────────────────────────────────────
+const MODEL_COLORS = {
+  synthetic:      { accent: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.25)" },
+  lgbm:           { accent: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)" },
+  tcn_xgb:        { accent: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)" },
+  adani_catboost: { accent: "#ec4899", bg: "rgba(236,72,153,0.08)", border: "rgba(236,72,153,0.25)" }, // pink
+  adani_lightgbm: { accent: "#06b6d4", bg: "rgba(6,182,212,0.08)", border: "rgba(6,182,212,0.25)" }, // cyan
+  adani_prophet:  { accent: "#f43f5e", bg: "rgba(244,63,94,0.08)", border: "rgba(244,63,94,0.25)" }, // rose
+  adani_stacking: { accent: "#84cc16", bg: "rgba(132,204,22,0.08)", border: "rgba(132,204,22,0.25)" }, // lime
+  adani_ultimate: { accent: "#6366f1", bg: "rgba(99,102,241,0.08)", border: "rgba(99,102,241,0.25)" }, // indigo
+  adani_voting:   { accent: "#14b8a6", bg: "rgba(20,184,166,0.08)", border: "rgba(20,184,166,0.25)" }, // teal
+  adani_xgboost:  { accent: "#d946ef", bg: "rgba(217,70,239,0.08)", border: "rgba(217,70,239,0.25)" }, // fuchsia
+};
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n) => n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : `${n}`;
@@ -100,22 +114,75 @@ function Spinner() {
   );
 }
 
+// ─── Model Selector ───────────────────────────────────────────────────────────
+function ModelSelector({ models, activeModel, onChange, loading }) {
+  if (!models || models.length === 0) return null;
+  const options = [{ key: "all", name: "All Models (Comparison)" }, ...models];
+  const active = options.find(o => o.key === activeModel) || options[0];
+
+  return (
+    <div style={{ marginBottom: "24px", maxWidth: "400px" }}>
+      <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
+        🤖 Select Forecast Model
+      </div>
+      <select
+        value={activeModel}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={loading}
+        style={{
+          width: "100%", padding: "12px 16px", borderRadius: "10px",
+          background: "var(--surface)", border: "1px solid var(--surface-border)",
+          color: "var(--foreground)", fontSize: "15px", fontWeight: "600",
+          outline: "none", cursor: loading ? "not-allowed" : "pointer",
+          appearance: "none", backgroundImage: "url('data:image/svg+xml;utf8,<svg fill=\"white\" height=\"24\" viewBox=\"0 0 24 24\" width=\"24\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M7 10l5 5 5-5z\"/></svg>')",
+          backgroundRepeat: "no-repeat", backgroundPosition: "calc(100% - 12px) center",
+        }}
+      >
+        {options.map(m => {
+          let suffix = "";
+          if (m.key !== "all" && !m.loaded) {
+            suffix = m.error ? ` (❌ Failed: ${m.error.split(",")[0].slice(0, 25)})` : " (⏳ Loading...)";
+          }
+          return (
+            <option key={m.key} value={m.key} disabled={m.key !== "all" && !m.loaded}>
+              {m.name}{suffix}
+            </option>
+          );
+        })}
+      </select>
+      {activeModel !== "all" && active.error && (
+        <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "8px" }}>
+          ⚠ {active.error.slice(0, 100)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── 24h Forecast Panel ───────────────────────────────────────────────────────
-function Forecast24h({ data }) {
+function Forecast24h({ data, models }) {
   if (!data) return <Spinner />;
-  const { slots, summary } = data;
-  const chartData = slots.map(s => ({
-    label: s.label,
-    p10: s.p10,
-    p50: s.p50,
-    p90: s.p90,
-    low: s.low_demand,
-  }));
+  const { slots, summary, model } = data;
+  const isAll = model === "all";
+
+  const chartData = slots.map(s => {
+    const p = {
+      label: s.label,
+      p10: s.p10,
+      p50: s.p50,
+      p90: s.p90,
+      low: s.low_demand,
+    };
+    if (isAll) {
+      Object.keys(s).filter(k => k.endsWith("_p50")).forEach(k => p[k] = s[k]);
+    }
+    return p;
+  });
 
   return (
     <>
       <SectionHeader
-        title="24-Hour Ahead Forecast"
+        title={isAll ? "24-Hour Ahead Forecast (All Models)" : "24-Hour Ahead Forecast"}
         sub="Hourly P10 / P50 / P90 quantile bands — updated every hour"
         tag={`Avg confidence ${data.summary?.avg_confidence}%`}
       />
@@ -136,11 +203,24 @@ function Forecast24h({ data }) {
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} interval={2} dy={8} />
           <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} tickFormatter={fmt} />
           <Tooltip content={<ChartTooltip />} />
+          {isAll && <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }} />}
           <ReferenceLine y={16500} stroke="#ef4444" strokeDasharray="4 2"
             label={{ value: "Capacity", fill: "#ef4444", fontSize: 10, position: "insideTopRight" }} />
-          <Area type="monotone" dataKey="p90" name="P90" stroke="#93c5fd" strokeWidth={1} fill="url(#bandFill)" strokeDasharray="4 2" />
-          <Area type="monotone" dataKey="p50" name="P50 (median)" stroke="#3b82f6" strokeWidth={2.5} fill="none" dot={false} />
-          <Area type="monotone" dataKey="p10" name="P10" stroke="#93c5fd" strokeWidth={1} fill="none" strokeDasharray="4 2" />
+          {!isAll && <Area type="monotone" dataKey="p90" name="P90" stroke="#93c5fd" strokeWidth={1} fill="url(#bandFill)" strokeDasharray="4 2" />}
+          {!isAll && <Area type="monotone" dataKey="p10" name="P10" stroke="#93c5fd" strokeWidth={1} fill="none" strokeDasharray="4 2" />}
+          
+          {isAll ? (
+            Object.keys(chartData[0] || {}).filter(k => k.endsWith("_p50")).map((key, i) => {
+              const modelKey = key.replace("_p50", "");
+              const modelInfo = models?.find(m => m.key === modelKey);
+              const displayName = modelInfo ? modelInfo.name : modelKey;
+              const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#6366f1", "#f43f5e"];
+              const color = MODEL_COLORS[modelKey]?.accent || colors[i % colors.length];
+              return <Area key={key} type="monotone" dataKey={key} name={displayName} stroke={color} strokeWidth={2} fill="none" dot={false} />;
+            })
+          ) : (
+            <Area type="monotone" dataKey="p50" name="P50 (median)" stroke="#3b82f6" strokeWidth={2.5} fill="none" dot={false} />
+          )}
         </AreaChart>
       </ResponsiveContainer>
 
@@ -363,9 +443,188 @@ function OffPeak({ data }) {
   );
 }
 
+
+// ─── Explainability Panel: SHAP and LIME XAI ──────────────────────────────────
+function XAIExplainPanel({ activeModel }) {
+  const [selectedHour, setSelectedHour] = useState(12);
+  const [selectedWeekday, setSelectedWeekday] = useState(0);
+  const [explainData, setExplainData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API}/explain?model=${activeModel}&hour=${selectedHour}&weekday=${selectedWeekday}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setExplainData(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [activeModel, selectedHour, selectedWeekday]);
+
+  const weekdays = [
+    { value: 0, label: "Monday" },
+    { value: 1, label: "Tuesday" },
+    { value: 2, label: "Wednesday" },
+    { value: 3, label: "Thursday" },
+    { value: 4, label: "Friday" },
+    { value: 5, label: "Saturday" },
+    { value: 6, label: "Sunday" },
+  ];
+
+  return (
+    <>
+      <SectionHeader
+        title="Explainable AI (XAI) Insights"
+        sub="Understand exactly what features drive model predictions via SHAP and LIME values"
+        tag="XAI Enabled"
+      />
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "32px" }}>
+        <div>
+          <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "6px" }}>
+            ⏰ Target Prediction Hour
+          </label>
+          <select
+            value={selectedHour}
+            onChange={(e) => setSelectedHour(parseInt(e.target.value))}
+            style={{
+              width: "100%", padding: "12px 16px", borderRadius: "10px",
+              background: "var(--surface)", border: "1px solid var(--surface-border)",
+              color: "var(--foreground)", fontSize: "14px", fontWeight: "600", outline: "none"
+            }}
+          >
+            {Array.from({ length: 24 }).map((_, h) => (
+              <option key={h} value={h}>{`${h.toString().padStart(2, "0")}:00`}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "6px" }}>
+            📅 Target Weekday
+          </label>
+          <select
+            value={selectedWeekday}
+            onChange={(e) => setSelectedWeekday(parseInt(e.target.value))}
+            style={{
+              width: "100%", padding: "12px 16px", borderRadius: "10px",
+              background: "var(--surface)", border: "1px solid var(--surface-border)",
+              color: "var(--foreground)", fontSize: "14px", fontWeight: "600", outline: "none"
+            }}
+          >
+            {weekdays.map((w) => (
+              <option key={w.value} value={w.value}>{w.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {loading && !explainData ? (
+        <Spinner />
+      ) : explainData ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+          
+          {/* Explanation Summary Card */}
+          <div style={{
+            background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.25)",
+            borderRadius: "14px", padding: "18px 24px", display: "flex", alignItems: "center", gap: "16px"
+          }}>
+            <span style={{ fontSize: "28px" }}>💡</span>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#8b5cf6", marginBottom: "2px" }}>AI Interpretation</div>
+              <div style={{ fontSize: "13px", color: "var(--foreground)", fontWeight: "500" }}>{explainData.summary}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px" }}>
+            {/* SHAP section */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🎯</span> SHAP Impact (Global Features)
+                </h3>
+                <Badge label={`Base load: ${explainData.base_value}`} color="info" />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {explainData.shap_values?.map((item, i) => {
+                  const pct = Math.min(100, Math.abs((item.impact / 1.0) * 100));
+                  const isPos = item.impact >= 0;
+                  return (
+                    <div key={i} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                        <span style={{ fontWeight: "600", color: "var(--foreground)" }}>{item.feature}</span>
+                        <span style={{ fontWeight: "700", color: isPos ? "#10b981" : "#ef4444" }}>
+                          {isPos ? "+" : ""}{item.impact.toFixed(3)}
+                        </span>
+                      </div>
+                      <div style={{ width: "100%", height: "8px", background: "var(--surface-border)", borderRadius: "4px", overflow: "hidden", position: "relative" }}>
+                        <div style={{
+                          width: `${pct}%`, height: "100%",
+                          background: isPos ? "linear-gradient(to right, #10b981, #34d399)" : "linear-gradient(to right, #ef4444, #f87171)",
+                          borderRadius: "4px", float: isPos ? "left" : "right"
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* LIME section */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🧩</span> LIME Explanations (Local Model Fit)
+                </h3>
+                <Badge label="Local Interpretation" color="success" />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {explainData.lime_explanations?.map((item, i) => {
+                  const pct = Math.min(100, Math.abs((item.coefficient / 1.0) * 100));
+                  const isPos = item.coefficient >= 0;
+                  return (
+                    <div key={i} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                        <span style={{ fontWeight: "600", color: "var(--foreground)" }}>{item.feature}</span>
+                        <span style={{ fontWeight: "700", color: isPos ? "#3b82f6" : "#f59e0b" }}>
+                          {isPos ? "+" : ""}{item.coefficient.toFixed(3)}
+                        </span>
+                      </div>
+                      <div style={{ width: "100%", height: "8px", background: "var(--surface-border)", borderRadius: "4px", overflow: "hidden", position: "relative" }}>
+                        <div style={{
+                          width: `${pct}%`, height: "100%",
+                          background: isPos ? "linear-gradient(to right, #3b82f6, #60a5fa)" : "linear-gradient(to right, #f59e0b, #fbbf24)",
+                          borderRadius: "4px", float: isPos ? "left" : "right"
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Premium Disclaimer Footnote */}
+          <div style={{
+            marginTop: "12px", padding: "14px 18px",
+            background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)",
+            borderRadius: "10px", fontSize: "12px", color: "var(--muted)"
+          }}>
+            <strong style={{ color: "var(--foreground)" }}>Explainability Note:</strong> SHAP (Shapley Additive exPlanations) uses game-theoretic weights to measure direct contribution toward predictions. LIME fits local surrogate models around specific hourly context. Together, they provide both global and localized operational insights.
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ForecastingPage() {
   const [tab, setTab] = useState("24h");
+  const [activeModel, setActiveModel] = useState("synthetic");
+  const [models, setModels] = useState([]);
   const [data24h, setData24h]   = useState(null);
   const [data7d,  setData7d]    = useState(null);
   const [dataPeak, setDataPeak] = useState(null);
@@ -374,15 +633,25 @@ export default function ForecastingPage() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
 
-  const refresh = useCallback(async () => {
+  // Fetch model registry
+  useEffect(() => {
+    fetch(`${API}/models`)
+      .then(r => r.json())
+      .then(d => setModels(d.models || []))
+      .catch(() => {});
+  }, []);
+
+  const refresh = useCallback(async (modelKey) => {
+    const m = modelKey || activeModel;
     setLoading(true);
     setError(null);
     try {
+      const qs = `model=${m}`;
       const [r24h, r7d, rPeak, rOff] = await Promise.all([
-        fetch(`${API}/24h`).then(r => r.json()),
-        fetch(`${API}/7day`).then(r => r.json()),
-        fetch(`${API}/peak-hours?days=7`).then(r => r.json()),
-        fetch(`${API}/offpeak`).then(r => r.json()),
+        fetch(`${API}/24h?${qs}`).then(r => r.json()),
+        fetch(`${API}/7day?${qs}`).then(r => r.json()),
+        fetch(`${API}/peak-hours?days=7&${qs}`).then(r => r.json()),
+        fetch(`${API}/offpeak?${qs}`).then(r => r.json()),
       ]);
       setData24h(r24h);
       setData7d(r7d);
@@ -393,15 +662,24 @@ export default function ForecastingPage() {
       setError("Cannot reach backend — make sure FastAPI is running on port 8000.");
     }
     setLoading(false);
-  }, []);
+  }, [activeModel]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const handleModelChange = (key) => {
+    setActiveModel(key);
+    setData24h(null); setData7d(null); setDataPeak(null); setDataOff(null);
+    refresh(key);
+  };
+
+  const activeModelInfo = models.find(m => m.key === activeModel);
 
   const TABS = [
     { id: "24h",    label: "24h Forecast",    icon: "⏱️" },
     { id: "7day",   label: "7-Day Outlook",   icon: "📅" },
     { id: "peak",   label: "Peak Hours",      icon: "⚡" },
     { id: "offpeak",label: "Off-Peak Windows",icon: "🌙" },
+    { id: "explain",label: "XAI Insights",     icon: "🔬" },
   ];
 
   return (
@@ -412,12 +690,17 @@ export default function ForecastingPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px" }}>
         <div>
           <h1 style={{ fontSize: "26px", fontWeight: "800", letterSpacing: "-0.02em" }}>Forecasting & Prediction</h1>
-          <p style={{ color: "var(--muted)", fontSize: "14px", marginTop: "4px" }}>
-            Mamba SSM · Maharashtra · {lastUpdated ? `Updated ${lastUpdated}` : "Loading…"}
+          <p style={{ color: "var(--muted)", fontSize: "14px", marginTop: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{
+              display: "inline-block", width: "7px", height: "7px", borderRadius: "50%",
+              background: (MODEL_COLORS[activeModel] || MODEL_COLORS.synthetic).accent,
+              boxShadow: `0 0 6px ${(MODEL_COLORS[activeModel] || MODEL_COLORS.synthetic).accent}80`,
+            }} />
+            {activeModelInfo?.name || "Synthetic Baseline"} · {activeModelInfo?.state || "Maharashtra"} · {lastUpdated ? `Updated ${lastUpdated}` : "Loading…"}
           </p>
         </div>
         <button
-          onClick={refresh}
+          onClick={() => refresh()}
           disabled={loading}
           style={{
             display: "flex", alignItems: "center", gap: "8px",
@@ -439,6 +722,9 @@ export default function ForecastingPage() {
           ⚠️ {error}
         </div>
       )}
+
+      {/* Model selector */}
+      <ModelSelector models={models} activeModel={activeModel} onChange={handleModelChange} loading={loading} />
 
       {/* Tab bar */}
       <div style={{ display: "flex", gap: "6px", background: "var(--accent)", padding: "4px", borderRadius: "12px", marginBottom: "28px", width: "fit-content" }}>
@@ -463,10 +749,11 @@ export default function ForecastingPage() {
 
       {/* Content panels */}
       <Panel>
-        {tab === "24h"     && <Forecast24h data={data24h} />}
-        {tab === "7day"    && <Forecast7Day data={data7d} />}
+        {tab === "24h"     && <Forecast24h data={data24h} models={models} />}
+        {tab === "7day"    && <Forecast7Day data={data7d} models={models} />}
         {tab === "peak"    && <PeakHours data={dataPeak} />}
         {tab === "offpeak" && <OffPeak data={dataOff} />}
+        {tab === "explain" && <XAIExplainPanel activeModel={activeModel} />}
       </Panel>
     </div>
   );

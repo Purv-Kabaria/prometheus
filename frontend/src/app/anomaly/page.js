@@ -13,7 +13,7 @@ import {
   Cell,
 } from "recharts";
 import Card from "@/components/Card";
-import { API_BASE } from "@/lib/api";
+const API_BASE = "http://localhost:8000";
 
 export default function AnomalyPage() {
   const [points, setPoints] = useState([]);
