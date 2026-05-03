@@ -6,3 +6,5 @@ all_years.csv
 .env
 .env.local
 backend/.env
+
+generate.py
