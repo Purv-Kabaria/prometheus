@@ -408,7 +408,9 @@ def retrain(
 
     # Also update final_submission/ so the NEXT retrain loads these latest weights
     for src in [new_tcn_path, new_sX_path, new_sy_path, new_xgb_path, new_meta_path]:
-        shutil.copy(src, parent_dir / src.name)
+        dst = parent_dir / src.name
+        if src.resolve() != dst.resolve():
+            shutil.copy(src, dst)
     log("✓ Artefacts promoted to final_submission/", step="SAVE")
 
     # ── 7. Update registry ────────────────────────────────────────────────────
