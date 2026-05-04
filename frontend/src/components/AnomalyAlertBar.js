@@ -43,10 +43,8 @@ export default function AnomalyAlertBar() {
     <div
       role="alert"
       style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
+        position: "relative",
+        width: "100%",
         zIndex: 50,
         background: "var(--accent)",
         borderBottom: "1px solid var(--surface-border)",
