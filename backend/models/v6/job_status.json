@@ -1,0 +1,5 @@
+{
+  "status": "failed",
+  "updated_at": "2026-05-04T04:04:58.394059+00:00",
+  "error": "Traceback (most recent call last):\n  File \"/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/scripts/retrain.py\", line 480, in <module>\n    retrain(\n  File \"/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/scripts/retrain.py\", line 411, in retrain\n    shutil.copy(src, parent_dir / src.name)\n  File \"/home/manav/.pyenv/versions/3.10.19/lib/python3.10/shutil.py\", line 417, in copy\n    copyfile(src, dst, follow_symlinks=follow_symlinks)\n  File \"/home/manav/.pyenv/versions/3.10.19/lib/python3.10/shutil.py\", line 234, in copyfile\n    raise SameFileError(\"{!r} and {!r} are the same file\".format(src, dst))\nshutil.SameFileError: PosixPath('/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/models/final_submission/final_prefix_xgb_corrector.json') and PosixPath('/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/models/final_submission/final_prefix_xgb_corrector.json') are the same file\n"
+}

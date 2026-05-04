@@ -1,0 +1,72 @@
+[04:04:56] (+  0.0s) 🚀 Prometheus retrain started  job=76be9607-03f7-49f6-a5a6-885fcbcad318
+[04:04:56] (+  0.0s)    new=v6  parent=v5
+[04:04:56] (+  0.0s)    epochs=2  batch=32  lr=5e-05  xgb_trees=30
+[04:04:56] (+  0.0s)    freeze_backbone=True
+
+──────────────────────────────────────────────────
+  STEP 1/7 · Loading parent artefacts
+──────────────────────────────────────────────────
+[04:04:56] (+  0.0s) [LOAD] Parent dir : /home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/models/final_submission
+/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/venv/lib/python3.10/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator StandardScaler from version 1.8.0 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+[04:04:56] (+  0.0s) [LOAD] ✓ scaler_X loaded
+[04:04:56] (+  0.0s) [LOAD] ✓ scaler_y loaded
+[04:04:56] (+  0.2s) [LOAD] Device     : cpu
+[04:04:56] (+  0.2s) [LOAD] ✓ TCN weights loaded (warm-start)
+
+──────────────────────────────────────────────────
+  STEP 2/7 · Building features
+──────────────────────────────────────────────────
+[04:04:56] (+  0.2s) [FEAT] Reading CSV : /home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/data/uploads/20260504T040453_upload_dd27.csv
+[04:04:56] (+  0.2s) [FEAT] Raw rows (upload) : 24
+[04:04:56] (+  0.2s) [FEAT] Combined with gold (240 rows) = 264 total rows
+/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/scripts/retrain.py:89: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df["datetime"] = pd.to_datetime(df["Start time UTC"], utc=True)
+[04:04:56] (+  0.3s) [FEAT] After feats : 96 rows
+[04:04:56] (+  0.3s) [FEAT] New rows for training : 48 (from upload)
+[04:04:56] (+  0.3s) [FEAT] Window size : 24
+
+──────────────────────────────────────────────────
+  STEP 3/7 · Scaling & sequencing
+──────────────────────────────────────────────────
+[04:04:56] (+  0.3s) [SCALE] ✓ Data scaled
+[04:04:56] (+  0.3s) [SCALE] Sequences   : 24  (shape (24, 24, 10))
+[04:04:56] (+  0.3s) [SCALE] Batches/epoch: 1
+
+──────────────────────────────────────────────────
+  STEP 4/7 · Fine-tuning TCN
+──────────────────────────────────────────────────
+[04:04:56] (+  0.3s) [TCN] Backbone frozen — trainable params: 65 (head only)
+[04:04:58] (+  1.5s) [TCN] Epoch 1/2 starting…
+[04:04:58] (+  1.5s) [TCN]   batch 1/1  loss=0.504551
+[04:04:58] (+  1.5s) [TCN] Epoch 1/2 done — avg HuberLoss: 0.504551
+[04:04:58] (+  1.5s) [TCN] Epoch 2/2 starting…
+[04:04:58] (+  1.5s) [TCN]   batch 1/1  loss=0.546158
+[04:04:58] (+  1.5s) [TCN] Epoch 2/2 done — avg HuberLoss: 0.546158
+
+──────────────────────────────────────────────────
+  STEP 5/7 · Updating XGB residual corrector
+──────────────────────────────────────────────────
+[04:04:58] (+  1.5s) [XGB] Residuals   : mean=-507.818  std=2630.087
+[04:04:58] (+  1.5s) [XGB] Fitting XGB on 24 samples, 30 trees…
+[04:04:58] (+  1.7s) [XGB] ✓ XGB saved → final_prefix_xgb_corrector.json
+
+──────────────────────────────────────────────────
+  STEP 6/7 · Saving artefacts
+──────────────────────────────────────────────────
+[04:04:58] (+  1.7s) [EVAL] MAPE on new data: 124.51%
+[04:04:58] (+  1.7s) [SAVE] ✓ TCN weights → final_prefix_tcn_weights.pth
+[04:04:58] (+  1.7s) [SAVE] ✓ Scalers saved
+[04:04:58] (+  1.7s) [SAVE] ✓ Metadata saved → final_prefix_metadata.json
+[04:04:58] (+  1.7s) ❌ Retrain FAILED:
+Traceback (most recent call last):
+  File "/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/scripts/retrain.py", line 480, in <module>
+    retrain(
+  File "/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/scripts/retrain.py", line 411, in retrain
+    shutil.copy(src, parent_dir / src.name)
+  File "/home/manav/.pyenv/versions/3.10.19/lib/python3.10/shutil.py", line 417, in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+  File "/home/manav/.pyenv/versions/3.10.19/lib/python3.10/shutil.py", line 234, in copyfile
+    raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+shutil.SameFileError: PosixPath('/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/models/final_submission/final_prefix_xgb_corrector.json') and PosixPath('/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/models/final_submission/final_prefix_xgb_corrector.json') are the same file

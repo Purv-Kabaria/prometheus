@@ -1,0 +1,24 @@
+{
+  "shape": [
+    240,
+    6
+  ],
+  "date_min": "2021-12-23 13:00:00+00:00",
+  "date_max": "2022-01-02 12:00:00+00:00",
+  "missing_values": {
+    "consumption": 0,
+    "hour": 0,
+    "dayofweek": 0,
+    "month": 0,
+    "is_weekend": 0,
+    "date": 0
+  },
+  "columns": [
+    "consumption",
+    "hour",
+    "dayofweek",
+    "month",
+    "is_weekend",
+    "date"
+  ]
+}

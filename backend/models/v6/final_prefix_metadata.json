@@ -1,0 +1,25 @@
+{
+  "features": [
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "lag_1h",
+    "lag_24h",
+    "lag_168h",
+    "roll_mean_24h",
+    "roll_std_24h",
+    "diff_1h"
+  ],
+  "target": "consumption",
+  "window_size": 24,
+  "mape_achieved": "124.51%",
+  "parent_version": "v5",
+  "trained_on": "/home/manav/My-Space/Projects/Prometheus-H/ps1_promtheus/backend/data/uploads/20260504T040453_upload_dd27.csv",
+  "trained_at": "2026-05-04T04:04:58.391858+00:00",
+  "epochs": 2,
+  "n_sequences": 24,
+  "freeze_backbone": true,
+  "xgb_trees": 30,
+  "device": "cpu"
+}

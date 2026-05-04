@@ -1,0 +1,32 @@
+[
+  {
+    "id": "pre-01",
+    "file": "/notebook/preprocess/pre_01_timeseries.png",
+    "title": "Consumption Time Series"
+  },
+  {
+    "id": "pre-02",
+    "file": "/notebook/preprocess/pre_02_distribution.png",
+    "title": "Consumption Distribution"
+  },
+  {
+    "id": "pre-03",
+    "file": "/notebook/preprocess/pre_03_hourly_profile.png",
+    "title": "Hourly Average Consumption"
+  },
+  {
+    "id": "pre-04",
+    "file": "/notebook/preprocess/pre_04_dayofweek_profile.png",
+    "title": "Day-of-Week Average Consumption"
+  },
+  {
+    "id": "pre-05",
+    "file": "/notebook/preprocess/pre_05_weekend_boxplot.png",
+    "title": "Weekend vs Weekday Consumption"
+  },
+  {
+    "id": "pre-06",
+    "file": "/notebook/preprocess/pre_06_correlation_heatmap.png",
+    "title": "Feature Correlation Heatmap"
+  }
+]

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 const plots = [
   { id: "viz-01", file: "/forecasting-models/viz_01.png", title: "Before Outlier Treatment: Consumption Distribution", section: "Data Validation" },
   { id: "viz-02", file: "/forecasting-models/viz_02.png", title: "After Outlier Treatment (Winsorized): Consumption Distribution", section: "Data Validation" },
@@ -62,7 +64,24 @@ function PlotItem({ plot, index }) {
   );
 }
 
+function StatCard({ label, value }) {
+  return (
+    <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "10px", padding: "12px" }}>
+      <p style={{ fontSize: "11px", color: "var(--muted)", marginBottom: "6px" }}>{label}</p>
+      <p style={{ fontSize: "14px", fontWeight: 700 }}>{value}</p>
+    </div>
+  );
+}
+
 export default function ForecastingVisualsPage() {
+  const [summary, setSummary] = useState(null);
+  const [prePlots, setPrePlots] = useState([]);
+
+  useEffect(() => {
+    fetch("/notebook/preprocess/summary.json").then((r) => r.json()).then(setSummary).catch(() => {});
+    fetch("/notebook/preprocess/meta.json").then((r) => r.json()).then(setPrePlots).catch(() => {});
+  }, []);
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: "28px", alignItems: "start" }}>
       <div>
@@ -74,9 +93,59 @@ export default function ForecastingVisualsPage() {
             Forecasting Visualizations (Collapsible)
           </h1>
           <p style={{ color: "var(--muted)", fontSize: "14px", lineHeight: 1.6 }}>
-            Full map of all extracted notebook charts. Expand only the visuals you want to inspect.
+            Preprocess results first, followed by the complete forecasting visual catalog.
           </p>
         </header>
+
+        <section style={{ marginBottom: "18px", background: "var(--accent)", border: "1px solid var(--surface-border)", borderRadius: "10px", padding: "14px" }}>
+          <p style={{ fontSize: "10px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+            Preprocess Section
+          </p>
+          <h2 className="serif" style={{ fontSize: "24px", fontWeight: 400, marginBottom: "10px" }}>
+            preprocess.ipynb Results
+          </h2>
+
+          {summary && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", marginBottom: "10px" }}>
+                <StatCard label="Data Shape" value={`${summary.shape?.[0] ?? "-"} rows x ${summary.shape?.[1] ?? "-"} cols`} />
+                <StatCard label="Date Range" value={`${summary.date_min ?? "-"} to ${summary.date_max ?? "-"}`} />
+              </div>
+
+              <details open style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "8px", padding: "10px", marginBottom: "10px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: "13px" }}>Derived Columns</summary>
+                <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {(summary.columns || []).map((c) => (
+                    <span key={c} style={{ fontSize: "12px", border: "1px solid var(--surface-border)", borderRadius: "999px", padding: "4px 10px", background: "var(--accent)" }}>{c}</span>
+                  ))}
+                </div>
+              </details>
+
+              <details open style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "8px", padding: "10px", marginBottom: "10px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: "13px" }}>Missing Values</summary>
+                <div style={{ marginTop: "8px", display: "grid", gap: "6px" }}>
+                  {Object.entries(summary.missing_values || {}).map(([k, v]) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed var(--surface-border)", paddingBottom: "4px", fontSize: "12px" }}>
+                      <span>{k}</span>
+                      <strong>{v}</strong>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </>
+          )}
+
+          <div style={{ display: "grid", gap: "10px" }}>
+            {prePlots.map((plot, idx) => (
+              <details key={plot.id} open={idx === 0} style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "10px", padding: "10px 12px" }}>
+                <summary style={{ cursor: "pointer", fontSize: "14px", fontWeight: 600 }}>{idx + 1}. {plot.title}</summary>
+                <div style={{ marginTop: "10px", border: "1px solid var(--surface-border)", borderRadius: "8px", overflow: "hidden" }}>
+                  <img src={plot.file} alt={plot.title} style={{ width: "100%", display: "block", background: "var(--background)" }} />
+                </div>
+              </details>
+            ))}
+          </div>
+        </section>
 
         {sections.map((section) => {
           const sectionPlots = plots.filter((p) => p.section === section);
@@ -111,6 +180,32 @@ export default function ForecastingVisualsPage() {
             Full Plot Map
           </p>
           <div style={{ display: "grid", gap: "10px", maxHeight: "72vh", overflow: "auto", paddingRight: "2px" }}>
+            <div>
+              <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Preprocess</p>
+              <div style={{ display: "grid", gap: "4px" }}>
+                {prePlots.map((plot) => (
+                  <a
+                    key={plot.id}
+                    href={plot.file}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontSize: "12px",
+                      lineHeight: 1.35,
+                      color: "var(--foreground)",
+                      textDecoration: "none",
+                      padding: "6px 8px",
+                      borderRadius: "7px",
+                      border: "1px solid var(--surface-border)",
+                      background: "var(--accent)",
+                    }}
+                  >
+                    {plot.id.toUpperCase()} - {plot.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+
             {sections.map((section) => {
               const sectionPlots = plots.filter((p) => p.section === section);
               return (
@@ -145,4 +240,3 @@ export default function ForecastingVisualsPage() {
     </div>
   );
 }
-
