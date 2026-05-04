@@ -37,6 +37,7 @@ export default function Sidebar() {
     { name: "Agent Decisions", href: "/agent" },
     { name: "Insights & Cost", href: "/insights" },
     { name: "Upload & Retrain", href: "/upload" },
+    { name: "Ember Energy API", href: "/ember" },
   ];
 
   return (

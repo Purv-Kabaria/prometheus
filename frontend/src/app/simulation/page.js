@@ -98,7 +98,14 @@ export default function GridSimulationPage() {
             {/* Grid Node */}
             <div style={{ position: "absolute", left: "50%", top: "45%", transform: "translate(-50%, -50%)", width: "120px", height: "120px", borderRadius: "50%", background: "radial-gradient(circle, var(--accent) 0%, var(--surface) 100%)", border: "2px solid var(--primary)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 0 30px rgba(0, 102, 204, 0.2)" }}>
                <span style={{ fontSize: "16px", fontWeight: "700", color: "var(--foreground)" }}>MAIN GRID</span>
-               <span style={{ fontSize: "12px", color: "var(--primary)", fontWeight: "600" }}>49.99 Hz</span>
+               <span style={{ fontSize: "12px", color: telemetry.reserve_margin_pct < 0 ? 'var(--danger)' : telemetry.reserve_margin_pct < 8 ? 'var(--warning)' : 'var(--primary)', fontWeight: "600" }}>
+                 {(() => {
+                   const rm = telemetry.reserve_margin_pct;
+                   if (rm < 0) return `${(49.5 + Math.max(-0.3, rm / 100 * 2)).toFixed(2)} Hz`;
+                   if (rm < 8) return `${(49.80 + (rm / 8) * 0.15).toFixed(2)} Hz`;
+                   return '49.99 Hz';
+                 })()}
+               </span>
             </div>
 
             {/* Demand Node */}

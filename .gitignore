@@ -6,6 +6,7 @@ final_merged.csv
 all_years.csv
 .env
 *.env
+docker-compose.yml
 
 # Runtime-generated state — never commit these
 backend/proposals_db.json

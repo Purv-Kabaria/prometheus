@@ -53,6 +53,7 @@ def get_demand_forecast(hours: int = 24) -> str:
 def get_committed_generation() -> str:
     """
     Get the current committed power generation broken down by source type.
+    Generation capacity dynamically reflects live equipment health from get_grid_equipment().
     Solar output uses real solar physics (sine curve peaking at noon).
     Total demand is derived from the real TCN+XGB forecast.
     """
@@ -67,33 +68,50 @@ def get_committed_generation() -> str:
         forecast_data = forecast_24h(model="tcn_xgb")
         slots = forecast_data.get("slots", [])
         current_demand = slots[0].get("p50", 13800) if slots else 13800
-        peak_mw = forecast_data.get("summary", {}).get("peak_mw", 15000)
+
+        # ── Dynamically aggregate capacity from live equipment health ────────
+        equipment = json.loads(get_grid_equipment())["equipment"]
+        base_cap = {"Coal Baseload": 0, "Solar Farm": 0, "Wind Farm": 0, "Hydro Plant": 0, "Gas Peaker Plant": 0}
+        derated_units = []
+        for eq in equipment:
+            typ = eq.get("type", "")
+            if typ in base_cap:
+                health = eq.get("health_pct", 100)
+                eff = 0.85 + (0.15 * (health / 100.0))
+                if eq.get("overdue"):
+                    eff = 0.40
+                    derated_units.append(f"{eq['id']} (health {health}%, overdue — derated to 40%)")
+                base_cap[typ] += int(eq.get("capacity_mw", 0) * eff)
+
+        coal_capacity  = base_cap["Coal Baseload"] or 6000
+        solar_capacity = base_cap["Solar Farm"] or 2500
+        wind_capacity  = base_cap["Wind Farm"] or 2000
+        hydro_capacity = base_cap["Hydro Plant"] or 2000
+        gas_capacity   = base_cap["Gas Peaker Plant"] or 3500
 
         # ── Coal baseload: stable, slightly fluctuates with minute ─────────
-        coal_output = round(6000 * 0.85 + (minute % 15) * 2)
+        coal_output = round(coal_capacity * 0.85 + (minute % 15) * 2)
 
         # ── Solar: physically real — zero at night, sine peak at noon ──────
-        solar_capacity = 2500  # MW (representative installed capacity)
         if 6 <= hour <= 18:
             solar_fraction = max(0.0, _math.sin(_math.pi * (hour - 6) / 12))
-            cloud_factor = 0.80 + (minute % 20) / 100   # ±20% cloud variation
+            cloud_factor = 0.80 + (minute % 20) / 100
             solar_output = round(solar_capacity * solar_fraction * cloud_factor)
         else:
             solar_output = 0
 
         # ── Wind: higher at night, stochastic but deterministic for demo ───
-        wind_capacity = 2000
         wind_base = 0.40 if (hour < 6 or hour > 20) else 0.28
         wind_jitter = ((hour * 7 + minute * 3) % 20 - 10) / 100
         wind_output = round(wind_capacity * max(0.10, min(0.85, wind_base + wind_jitter)))
 
         # ── Hydro: dispatchable, follows demand curve ───────────────────────
-        hydro_output = round(2000 * (0.60 if 8 <= hour <= 22 else 0.35))
+        hydro_output = round(hydro_capacity * (0.60 if 8 <= hour <= 22 else 0.35))
 
         # ── Gas peakers: fill the gap to meet demand + 8% spinning reserve ─
         renewables = coal_output + solar_output + wind_output + hydro_output
-        target = round(current_demand * 1.08)   # 8% spinning reserve
-        gas_output = max(0, min(3500, target - renewables))
+        target = round(current_demand * 1.08)
+        gas_output = max(0, min(gas_capacity, target - renewables))
 
         total = coal_output + solar_output + wind_output + hydro_output + gas_output
         headroom = round(total - current_demand)
@@ -120,7 +138,8 @@ def get_committed_generation() -> str:
                 "hydro_mw":        hydro_output,
                 "gas_peaker_mw":   gas_output
             },
-            "note": "Solar uses real physics (sine curve). Demand from real TCN+XGB forecast. Other sources are simulated."
+            "derated_units": derated_units,
+            "note": "Capacity dynamically derived from live equipment health. Derated units are severely throttled."
         })
     except Exception as e:
         return json.dumps({"status": "fallback", "total_generation_mw": 15000, "unit": "MW", "error": str(e)})
@@ -237,6 +256,16 @@ def propose_grid_action(action_type: str, target_mwh: float, target_hour: str, r
 @mcp.tool()
 def schedule_maintenance(equipment_id: str, start_time: str, end_time: str, rationale: str = "") -> str:
     """Propose a maintenance schedule for grid equipment during predicted low-demand windows. Always use the window from find_optimal_maintenance_window."""
+    # ── Server-side ID validation — prevents LLM hallucinations ──────────────
+    equipment = _load_equipment()
+    valid_ids = [eq["id"] for eq in equipment]
+    if equipment_id not in valid_ids:
+        return json.dumps({
+            "status": "error",
+            "message": f"Invalid equipment_id '{equipment_id}'. You MUST use one of the real IDs returned by get_grid_equipment(). Valid IDs are: {valid_ids}. Call get_grid_equipment() first to get the correct IDs.",
+        })
+    # ─────────────────────────────────────────────────────────────────────────
+
     proposal_id = f"maint_{random.randint(1000, 9999)}"
     proposal = {
         "id": proposal_id,
@@ -252,6 +281,51 @@ def schedule_maintenance(equipment_id: str, start_time: str, end_time: str, rati
     return json.dumps({
         "status": "success", 
         "message": "Maintenance proposal submitted to dashboard.", 
+        "proposal_id": proposal_id
+    })
+
+@mcp.tool()
+def analyze_market_finance(entity_code: str = "IND") -> str:
+    """Get the current carbon compliance liability of the grid using Ember API live data."""
+    try:
+        import asyncio
+        from services.ember_client import ember_client
+        
+        # In a threadpool where no event loop is running, asyncio.run works.
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
+            
+        if loop and loop.is_running():
+            import nest_asyncio
+            nest_asyncio.apply()
+            data = loop.run_until_complete(ember_client.calculate_carbon_liability(entity_code))
+        else:
+            data = asyncio.run(ember_client.calculate_carbon_liability(entity_code))
+            
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+@mcp.tool()
+def propose_emissions_trade(entity_code: str, action: str, tonnes_co2: float, price_usd: float, rationale: str) -> str:
+    """Propose a carbon emission credit trade ('buy' or 'sell') to the grid officer based on compliance liability."""
+    proposal_id = f"trade_{random.randint(1000, 9999)}"
+    proposal = {
+        "id": proposal_id,
+        "action_type": "carbon_trade",
+        "trade_action": action,
+        "entity_code": entity_code,
+        "tonnes_co2": tonnes_co2,
+        "price_usd": price_usd,
+        "rationale": rationale,
+        "status": "pending_approval"
+    }
+    add_proposal(proposal)
+    return json.dumps({
+        "status": "success", 
+        "message": f"Carbon trade proposal ({action} {tonnes_co2} tonnes) submitted for approval.", 
         "proposal_id": proposal_id
     })
 
