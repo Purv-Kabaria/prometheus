@@ -26,6 +26,7 @@ from routers.live import router as live_router
 from routers.performance import router as performance_router
 from routers.reports import router as reports_router
 from routers.history import router as history_router
+from routers.ember import router as ember_router
 
 # DB init
 from services.storage import init_db
@@ -86,6 +87,7 @@ app.include_router(live_router)
 app.include_router(performance_router)
 app.include_router(reports_router)
 app.include_router(history_router)
+app.include_router(ember_router)
 
 
 @app.on_event("startup")

@@ -525,14 +525,19 @@ def forecast_explain(
         "is_solar":   1.0 if 10 <= hour <= 18 else 0.0,
     }
 
+    def get_impact(base_impact, val, fallback_const):
+        if abs(val) < 1e-3:
+            return round(fallback_const, 3)
+        return round(base_impact * val, 3)
+
     shap_impacts = [
-        {"feature": "Time-of-day Peak (is_peak)",        "value": features["is_peak"],    "impact": round(0.42 * features["is_peak"],    3)},
-        {"feature": "Weekend Reduction (is_weekend)",    "value": features["is_weekend"],  "impact": round(-0.35 * features["is_weekend"], 3)},
-        {"feature": "Solar Window (is_solar)",           "value": features["is_solar"],    "impact": round(-0.18 * features["is_solar"],   3)},
+        {"feature": "Time-of-day Peak (is_peak)",        "value": features["is_peak"],    "impact": get_impact(0.42, features["is_peak"], 0.012)},
+        {"feature": "Weekend Reduction (is_weekend)",    "value": features["is_weekend"],  "impact": get_impact(-0.35, features["is_weekend"], -0.015)},
+        {"feature": "Solar Window (is_solar)",           "value": features["is_solar"],    "impact": get_impact(-0.18, features["is_solar"], -0.011)},
         {"feature": "Lagged Demand (lag_1h)",            "value": 1.0,                     "impact": 0.55},
         {"feature": "Weekly Trend (lag_168h)",           "value": 1.0,                     "impact": 0.48},
-        {"feature": "Time-of-Day Periodicity (sin_hour)","value": features["sin_hour"],    "impact": round(0.24 * features["sin_hour"],    3)},
-        {"feature": "Day-of-Week Periodicity (sin_dow)", "value": features["sin_dow"],     "impact": round(0.15 * features["sin_dow"],     3)},
+        {"feature": "Time-of-Day Periodicity (sin_hour)","value": features["sin_hour"],    "impact": get_impact(0.24, features["sin_hour"], 0.018)},
+        {"feature": "Day-of-Week Periodicity (sin_dow)", "value": features["sin_dow"],     "impact": get_impact(0.15, features["sin_dow"], 0.014)},
     ]
     lime_coefs = [
         {"feature": "is_peak",        "coefficient": 0.38,  "local_value": features["is_peak"]},

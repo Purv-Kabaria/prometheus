@@ -1,16 +1,71 @@
-[01:34:38] (+  0.0s) 🚀 Prometheus retrain started  job=65c11806-9bbe-4be9-8232-0fcdfe9d6abe
-[01:34:38] (+  0.0s)    new=v3  parent=v2
-[01:34:38] (+  0.0s)    epochs=2  batch=32  lr=5e-05  xgb_trees=30
-[01:34:38] (+  0.0s)    freeze_backbone=True
+[02:04:13] (+  0.0s) 🚀 Prometheus retrain started  job=0623b844-7fb9-4811-8ef3-d3991d076b18
+[02:04:13] (+  0.0s)    new=v3  parent=v2
+[02:04:13] (+  0.0s)    epochs=2  batch=32  lr=5e-05  xgb_trees=30
+[02:04:13] (+  0.0s)    freeze_backbone=True
 
 ──────────────────────────────────────────────────
   STEP 1/7 · Loading parent artefacts
 ──────────────────────────────────────────────────
-[01:34:38] (+  0.0s) [LOAD] Parent dir : D:\CODING\ps1_promtheus\backend\models\v2
-[01:34:38] (+  0.0s) ❌ Retrain FAILED:
+[02:04:13] (+  0.0s) [LOAD] Parent dir : D:\Aayush\Projects\powermind_adani_hackthon\backend\models\final_submission
+[02:04:13] (+  0.0s) [LOAD] ✓ scaler_X loaded
+[02:04:13] (+  0.0s) [LOAD] ✓ scaler_y loaded
+[02:04:13] (+  0.0s) [LOAD] Device     : cpu
+[02:04:13] (+  0.1s) [LOAD]    (weights not loaded for 44 keys — fresh init for those)
+[02:04:13] (+  0.1s) [LOAD] ✓ TCN weights loaded (warm-start)
+
+──────────────────────────────────────────────────
+  STEP 2/7 · Building features
+──────────────────────────────────────────────────
+[02:04:13] (+  0.1s) [FEAT] Reading CSV : D:\Aayush\Projects\powermind_adani_hackthon\backend\data\uploads\20260504T020406_sample_upload.csv
+[02:04:13] (+  0.1s) [FEAT] Raw rows (upload) : 5
+[02:04:13] (+  0.1s) [FEAT] Combined with gold (205 rows) = 210 total rows
+D:\Aayush\Projects\powermind_adani_hackthon\backend\scripts\retrain.py:89: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df["datetime"] = pd.to_datetime(df["Start time UTC"], utc=True)
+[02:04:13] (+  0.2s) [FEAT] After feats : 42 rows
+[02:04:13] (+  0.2s) [FEAT] New rows for training : 10 (from upload)
+[02:04:13] (+  0.2s) [FEAT] ⚠ Small upload (10 rows) — adaptive window: 9 (normal=24)
+
+──────────────────────────────────────────────────
+  STEP 3/7 · Scaling & sequencing
+──────────────────────────────────────────────────
+[02:04:13] (+  0.2s) [SCALE] ✓ Data scaled
+[02:04:13] (+  0.2s) [SCALE] Sequences   : 1  (shape (1, 9, 10))
+[02:04:13] (+  0.2s) [SCALE] Batches/epoch: 1
+
+──────────────────────────────────────────────────
+  STEP 4/7 · Fine-tuning TCN
+──────────────────────────────────────────────────
+[02:04:13] (+  0.2s) [TCN] Backbone frozen — trainable params: 65 (head only)
+[02:04:16] (+  3.2s) [TCN] Epoch 1/2 starting…
+[02:04:16] (+  3.4s) [TCN]   batch 1/1  loss=4.382280
+[02:04:16] (+  3.4s) [TCN] Epoch 1/2 done — avg HuberLoss: 4.382280
+[02:04:16] (+  3.4s) [TCN] Epoch 2/2 starting…
+[02:04:16] (+  3.4s) [TCN]   batch 1/1  loss=3.395540
+[02:04:16] (+  3.4s) [TCN] Epoch 2/2 done — avg HuberLoss: 3.395540
+
+──────────────────────────────────────────────────
+  STEP 5/7 · Updating XGB residual corrector
+──────────────────────────────────────────────────
+[02:04:16] (+  3.4s) [XGB] Residuals   : mean=-5965.125  std=0.000
+[02:04:16] (+  3.4s) [XGB] Too few sequences (1) for XGB — copying parent unchanged.
+[02:04:16] (+  3.4s) ❌ Retrain FAILED:
 Traceback (most recent call last):
-  File "D:\CODING\ps1_promtheus\backend\scripts\retrain.py", line 477, in <module>
+  File "D:\Aayush\Projects\powermind_adani_hackthon\backend\scripts\retrain.py", line 474, in <module>
     retrain(
-  File "D:\CODING\ps1_promtheus\backend\scripts\retrain.py", line 202, in retrain
-    with open(scaler_X_path, "rb") as f:
-FileNotFoundError: [Errno 2] No such file or directory: 'D:\\CODING\\ps1_promtheus\\backend\\models\\v2\\final_prefix_scaler_X.pkl'
+    ~~~~~~~^
+        job_id          = args.job_id,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+        xgb_trees       = args.xgb_trees,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Aayush\Projects\powermind_adani_hackthon\backend\scripts\retrain.py", line 366, in retrain
+    shutil.copy(xgb_path, new_xgb_path)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\dipan\miniconda3\Lib\shutil.py", line 428, in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\dipan\miniconda3\Lib\shutil.py", line 240, in copyfile
+    raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+shutil.SameFileError: WindowsPath('D:/Aayush/Projects/powermind_adani_hackthon/backend/models/final_submission/final_prefix_xgb_corrector.json') and WindowsPath('D:/Aayush/Projects/powermind_adani_hackthon/backend/models/final_submission/final_prefix_xgb_corrector.json') are the same file

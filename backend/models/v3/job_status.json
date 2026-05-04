@@ -1,5 +1,14 @@
 {
-  "status": "failed",
-  "updated_at": "2026-05-04T01:34:38.661060+00:00",
-  "error": "Traceback (most recent call last):\n  File \"D:\\CODING\\ps1_promtheus\\backend\\scripts\\retrain.py\", line 477, in <module>\n    retrain(\n  File \"D:\\CODING\\ps1_promtheus\\backend\\scripts\\retrain.py\", line 202, in retrain\n    with open(scaler_X_path, \"rb\") as f:\nFileNotFoundError: [Errno 2] No such file or directory: 'D:\\\\CODING\\\\ps1_promtheus\\\\backend\\\\models\\\\v2\\\\final_prefix_scaler_X.pkl'\n"
+  "status": "done",
+  "updated_at": "2026-05-04T02:17:05.778093+00:00",
+  "job_id": "test-002",
+  "mape": "120.41%",
+  "elapsed_s": 2.18,
+  "artefacts": [
+    "models\\v3\\final_prefix_tcn_weights.pth",
+    "models\\v3\\final_prefix_xgb_corrector.json",
+    "models\\v3\\final_prefix_scaler_X.pkl",
+    "models\\v3\\final_prefix_scaler_y.pkl",
+    "models\\v3\\final_prefix_metadata.json"
+  ]
 }

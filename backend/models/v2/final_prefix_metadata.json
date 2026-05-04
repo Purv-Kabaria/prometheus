@@ -1,0 +1,25 @@
+{
+  "features": [
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "lag_1h",
+    "lag_24h",
+    "lag_168h",
+    "roll_mean_24h",
+    "roll_std_24h",
+    "diff_1h"
+  ],
+  "target": "consumption",
+  "window_size": 4,
+  "mape_achieved": "123.47%",
+  "parent_version": "v1",
+  "trained_on": "data\\sample_upload.csv",
+  "trained_at": "2026-05-03T18:15:21.357512+00:00",
+  "epochs": 1,
+  "n_sequences": 1,
+  "freeze_backbone": true,
+  "xgb_trees": 10,
+  "device": "cpu"
+}

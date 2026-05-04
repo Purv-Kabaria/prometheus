@@ -1,0 +1,68 @@
+[02:23:05] (+  0.0s) 🚀 Prometheus retrain started  job=720965a6-3250-4453-a76e-61e4ae757d4b
+[02:23:05] (+  0.0s)    new=v5  parent=v4
+[02:23:05] (+  0.0s)    epochs=2  batch=32  lr=5e-05  xgb_trees=30
+[02:23:05] (+  0.0s)    freeze_backbone=True
+
+──────────────────────────────────────────────────
+  STEP 1/7 · Loading parent artefacts
+──────────────────────────────────────────────────
+[02:23:05] (+  0.0s) [LOAD] Parent dir : D:\Aayush\Projects\powermind_adani_hackthon\backend\models\final_submission
+[02:23:05] (+  0.0s) [LOAD] ✓ scaler_X loaded
+[02:23:05] (+  0.0s) [LOAD] ✓ scaler_y loaded
+[02:23:05] (+  0.0s) [LOAD] Device     : cpu
+[02:23:05] (+  0.1s) [LOAD] ✓ TCN weights loaded (warm-start)
+
+──────────────────────────────────────────────────
+  STEP 2/7 · Building features
+──────────────────────────────────────────────────
+[02:23:05] (+  0.1s) [FEAT] Reading CSV : D:\Aayush\Projects\powermind_adani_hackthon\backend\data\uploads\20260504T022254_test_upload_2.csv
+[02:23:05] (+  0.1s) [FEAT] Raw rows (upload) : 6
+[02:23:05] (+  0.1s) [FEAT] Combined with gold (216 rows) = 222 total rows
+D:\Aayush\Projects\powermind_adani_hackthon\backend\scripts\retrain.py:89: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df["datetime"] = pd.to_datetime(df["Start time UTC"], utc=True)
+[02:23:05] (+  0.2s) [FEAT] After feats : 54 rows
+[02:23:05] (+  0.2s) [FEAT] New rows for training : 12 (from upload)
+[02:23:05] (+  0.2s) [FEAT] ⚠ Small upload (12 rows) — adaptive window: 11 (normal=24)
+
+──────────────────────────────────────────────────
+  STEP 3/7 · Scaling & sequencing
+──────────────────────────────────────────────────
+[02:23:05] (+  0.2s) [SCALE] ✓ Data scaled
+[02:23:05] (+  0.2s) [SCALE] Sequences   : 1  (shape (1, 11, 10))
+[02:23:05] (+  0.2s) [SCALE] Batches/epoch: 1
+
+──────────────────────────────────────────────────
+  STEP 4/7 · Fine-tuning TCN
+──────────────────────────────────────────────────
+[02:23:05] (+  0.2s) [TCN] Backbone frozen — trainable params: 65 (head only)
+[02:23:11] (+  5.9s) [TCN] Epoch 1/2 starting…
+[02:23:11] (+  5.9s) [TCN]   batch 1/1  loss=2.739977
+[02:23:11] (+  5.9s) [TCN] Epoch 1/2 done — avg HuberLoss: 2.739977
+[02:23:11] (+  5.9s) [TCN] Epoch 2/2 starting…
+[02:23:11] (+  5.9s) [TCN]   batch 1/1  loss=2.289656
+[02:23:11] (+  5.9s) [TCN] Epoch 2/2 done — avg HuberLoss: 2.289656
+
+──────────────────────────────────────────────────
+  STEP 5/7 · Updating XGB residual corrector
+──────────────────────────────────────────────────
+[02:23:11] (+  5.9s) [XGB] Residuals   : mean=-4947.893  std=0.000
+[02:23:11] (+  5.9s) [XGB] Too few sequences (1) for XGB — copying parent unchanged.
+
+──────────────────────────────────────────────────
+  STEP 6/7 · Saving artefacts
+──────────────────────────────────────────────────
+[02:23:11] (+  5.9s) [EVAL] MAPE on new data: 118.17%
+[02:23:11] (+  6.0s) [SAVE] ✓ TCN weights → final_prefix_tcn_weights.pth
+[02:23:11] (+  6.0s) [SAVE] ✓ Scalers saved
+[02:23:11] (+  6.0s) [SAVE] ✓ Metadata saved → final_prefix_metadata.json
+[02:23:11] (+  6.1s) [SAVE] ✓ Artefacts promoted to final_submission/
+
+──────────────────────────────────────────────────
+  STEP 7/7 · Updating registry
+──────────────────────────────────────────────────
+[02:23:11] (+  6.1s) [REG] ✓ Registry updated. Active version: v5
+
+──────────────────────────────────────────────────
+    DONE  (6.1s total)
+──────────────────────────────────────────────────
+[02:23:11] (+  6.1s) v4 → v5  |  MAPE 118.17%  |  1 sequences

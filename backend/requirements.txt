@@ -45,3 +45,4 @@ langchain-ollama>=0.1.0
 reportlab
 mcp
 shap>=0.45.0
+nest-asyncio
