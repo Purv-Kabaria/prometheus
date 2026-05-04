@@ -251,9 +251,17 @@ export default function GridOfficerDashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               {[
                 { label: "Committed Generation", value: telemetry.generation ? `${telemetry.generation.toLocaleString()} MW` : "—", status: "Nominal" },
-                { label: "Forecast Demand", value: telemetry.demand ? `${telemetry.demand.toLocaleString()} MW` : "—", status: "Nominal", warning: telemetry.demand > 12000 },
-                { label: "Frequency", value: "49.99 Hz", status: "Nominal" },
-                { label: "Reserve Margin", value: "18.5%", status: "Optimal" }
+                { label: "Forecast Demand", value: telemetry.demand ? `${Math.round(telemetry.demand).toLocaleString()} MW` : "—", status: "Nominal", warning: telemetry.demand > 12000 },
+                (() => {
+                  const rm = telemetry.reserveMarginPct;
+                  const freq = rm === null ? '...' : rm < 0 ? `${(49.5 + Math.max(-0.3, rm / 100 * 2)).toFixed(2)} Hz` : rm < 8 ? `${(49.80 + (rm / 8) * 0.15).toFixed(2)} Hz` : '49.99 Hz';
+                  const freqStatus = rm === null ? 'Loading' : rm < 0 ? 'CRITICAL' : rm < 8 ? 'Warning' : 'Nominal';
+                  return { label: "Grid Frequency", value: freq, status: freqStatus, warning: rm !== null && rm < 8 };
+                })(),
+                (() => {
+                  const rm = telemetry.reserveMarginPct;
+                  return { label: "Reserve Margin", value: rm !== null ? `${rm}%` : "—", status: rm === null ? 'Loading' : rm >= 8 ? 'Optimal' : rm >= 0 ? 'Warning' : 'CRITICAL', warning: rm !== null && rm < 0 };
+                })()
               ].map(stat => (
                 <div key={stat.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "12px", color: "var(--muted)" }}>{stat.label}</span>
