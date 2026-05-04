@@ -29,6 +29,7 @@ export default function Sidebar() {
 
   const links = [
     { name: "Overview", href: "/" },
+    { name: "Grid Simulation", href: "/simulation" },
     { name: "Forecasting", href: "/forecasting" },
     { name: "Forecasting Visualizations", href: "/forecasting-visuals" },
     { name: "Reporting", href: "/reporting" },

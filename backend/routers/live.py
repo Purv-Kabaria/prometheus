@@ -6,12 +6,39 @@ backed by the SQLite predictions store (populated by the seeding script).
 from fastapi import APIRouter, Query
 import pandas as pd
 import numpy as np
+import json
+from pathlib import Path
+from datetime import datetime
 
 from services.storage import get_recent_history, log_prediction, DB_PATH
 from services.features import load_and_preprocess_data, engineer_features
 from services.inference import predict_quantiles
 
 router = APIRouter(prefix="/api/live-comparison", tags=["Operational Intelligence"])
+
+_EQUIPMENT_JSON = Path(__file__).parent.parent / "data" / "equipment.json"
+
+@router.get("/equipment")
+def get_equipment_status():
+    """Return all grid equipment with live maintenance health scores."""
+    try:
+        with open(_EQUIPMENT_JSON) as f:
+            equipment = json.load(f)
+    except Exception:
+        return {"equipment": []}
+
+    today = datetime.now().date()
+    for eq in equipment:
+        last      = datetime.strptime(eq["last_maintained"], "%Y-%m-%d").date()
+        days_since = (today - last).days
+        interval   = eq["maintenance_interval_days"]
+        eq["days_since_last_maintenance"] = days_since
+        eq["overdue"]    = days_since > interval
+        eq["status"]     = "needs_maintenance" if eq["overdue"] else "active"
+        # health_pct = 100 when just maintained, 0 when overdue by a full interval
+        eq["health_pct"] = max(0, round(100 * (1 - days_since / interval), 1))
+    return {"equipment": equipment}
+
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -89,7 +116,8 @@ def get_live_comparison(
 def get_live_generation():
     """
     Returns real-time committed generation breakdown by source.
-    Solar uses a physics-based sine curve. Demand comes from the real TCN+XGB forecast.
+    Solar uses a physics-based sine curve. Demand comes from the real forecast.
+    Base capacity dynamically reacts to asset health in equipment.json!
     """
     import math as _math
     from datetime import datetime as _dt
@@ -107,11 +135,37 @@ def get_live_generation():
     except Exception:
         current_demand, peak_mw = 13800, 15000
 
-    # Coal baseload — stable with minor fluctuation
-    coal_output = round(6000 * 0.85 + (minute % 15) * 2)
+    # Dynamically query asset health!
+    try:
+        eq_status = get_equipment_status()["equipment"]
+    except Exception:
+        eq_status = []
+    
+    base_cap = {"Coal Baseload": 0, "Solar Farm": 0, "Wind Farm": 0, "Hydro Plant": 0, "Gas Peaker Plant": 0}
+    for eq in eq_status:
+        typ = eq.get("type", "")
+        if typ in base_cap:
+            health = eq.get("health_pct", 100)
+            
+            # Normal wear and tear drops efficiency from 100% down to 85% linearly
+            eff = 0.85 + (0.15 * (health / 100.0))
+            
+            if eq.get("overdue"):
+                # If overdue, safety regulations force a severe derating (40% capacity)
+                eff = 0.40
+                
+            base_cap[typ] += int(eq.get("capacity_mw", 0) * eff)
+
+    coal_capacity  = base_cap["Coal Baseload"] or 6000
+    solar_capacity = base_cap["Solar Farm"] or 2500
+    wind_capacity  = base_cap["Wind Farm"] or 2000
+    hydro_capacity = base_cap["Hydro Plant"] or 2000
+    gas_capacity   = base_cap["Gas Peaker Plant"] or 3500
+
+    # Coal baseload — stable with minor fluctuation based on healthy capacity
+    coal_output = round(coal_capacity * 0.85 + (minute % 15) * 2)
 
     # Solar — physically real: zero at night, sine peak at noon
-    solar_capacity = 2500
     if 6 <= hour <= 18:
         solar_fraction = max(0.0, _math.sin(_math.pi * (hour - 6) / 12))
         cloud_factor   = 0.80 + (minute % 20) / 100
@@ -120,18 +174,17 @@ def get_live_generation():
         solar_output = 0
 
     # Wind — higher at night, deterministic jitter
-    wind_capacity = 2000
     wind_base  = 0.40 if (hour < 6 or hour > 20) else 0.28
     wind_jitter = ((hour * 7 + minute * 3) % 20 - 10) / 100
     wind_output = round(wind_capacity * max(0.10, min(0.85, wind_base + wind_jitter)))
 
     # Hydro — dispatchable
-    hydro_output = round(2000 * (0.60 if 8 <= hour <= 22 else 0.35))
+    hydro_output = round(hydro_capacity * (0.60 if 8 <= hour <= 22 else 0.35))
 
     # Gas peakers fill the gap (target: demand + 8% spinning reserve)
     renewables  = coal_output + solar_output + wind_output + hydro_output
     target      = round(current_demand * 1.08)
-    gas_output  = max(0, min(3500, target - renewables))
+    gas_output  = max(0, min(gas_capacity, target - renewables))
 
     total    = coal_output + solar_output + wind_output + hydro_output + gas_output
     headroom = round(total - current_demand)

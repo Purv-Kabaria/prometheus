@@ -5,22 +5,24 @@ import Card from '@/components/Card';
 import ProposalCard from '@/components/agent/ProposalCard';
 import FeedbackModal from '@/components/agent/FeedbackModal';
 
-const API_BASE = 'http://localhost:8000/api/agent';
-const FORECAST_API = 'http://localhost:8000/api/forecast/24h';
+const API_BASE = 'http://127.0.0.1:8000/api/agent';
+const FORECAST_API = 'http://127.0.0.1:8000/api/forecast/24h';
+const GEN_API = 'http://127.0.0.1:8000/api/live-comparison/generation';
+const SUMMARY_API = 'http://127.0.0.1:8000/api/reports/today-summary';
 
 export default function AgentDecisionsPage() {
-  const [proposals, setProposals]     = useState([]);
+  const [proposals, setProposals] = useState([]);
   const [agentRunning, setAgentRunning] = useState(false);
-  const [userPrompt, setUserPrompt]   = useState('');
+  const [userPrompt, setUserPrompt] = useState('');
   const defaultMessages = [
     { role: 'agent', text: 'Prometheus Intelligence online. I am monitoring the grid for imbalances and maintenance opportunities. How can I assist you today?', timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }
   ];
-  
-  const [messages, setMessages]       = useState(defaultMessages);
-  const [modalState, setModalState]   = useState({ isOpen: false, proposal: null, mode: null });
-  const [telemetry, setTelemetry]     = useState({ demand: null, generation: null });
-  const [stats, setStats]             = useState({ total: 0, accepted: 0, rejected: 0, overridden: 0 });
-  
+
+  const [messages, setMessages] = useState(defaultMessages);
+  const [modalState, setModalState] = useState({ isOpen: false, proposal: null, mode: null });
+  const [telemetry, setTelemetry] = useState({ demand: null, generation: null });
+  const [stats, setStats] = useState({ total: 0, accepted: 0, rejected: 0, overridden: 0 });
+
   const chatEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -30,7 +32,7 @@ export default function AgentDecisionsPage() {
   useEffect(() => {
     const saved = sessionStorage.getItem('prometheus_chat');
     if (saved) {
-      try { setMessages(JSON.parse(saved)); } catch (e) {}
+      try { setMessages(JSON.parse(saved)); } catch (e) { }
     }
   }, []);
 
@@ -42,14 +44,14 @@ export default function AgentDecisionsPage() {
   // ── Fetch proposals & derive stats ──────────────────────────────────────────
   const fetchProposals = useCallback(async () => {
     try {
-      const res  = await fetch(`${API_BASE}/proposals`);
+      const res = await fetch(`${API_BASE}/proposals`);
       const data = await res.json();
-      const all  = data.proposals || [];
+      const all = data.proposals || [];
       setProposals(all);
       setStats({
-        total:     all.length,
-        accepted:  all.filter(p => p.status === 'accepted').length,
-        rejected:  all.filter(p => p.status === 'rejected').length,
+        total: all.length,
+        accepted: all.filter(p => p.status === 'accepted').length,
+        rejected: all.filter(p => p.status === 'rejected').length,
         overridden: all.filter(p => p.status === 'overridden').length,
       });
     } catch { /* backend may not be ready yet */ }
@@ -58,14 +60,14 @@ export default function AgentDecisionsPage() {
   // ── Fetch live telemetry from forecast API ───────────────────────────────────
   const fetchTelemetry = useCallback(async () => {
     try {
-      const res  = await fetch(FORECAST_API);
+      const res = await fetch(FORECAST_API);
       const data = await res.json();
       const currentHour = new Date().getHours();
       const slot = data.slots?.[currentHour];
       const peak = data.summary?.peak_mw;
       if (slot) {
         setTelemetry({
-          demand:     slot.p50,
+          demand: slot.p50,
           generation: peak ? Math.round(peak * 1.10) : null,
         });
       }
@@ -84,7 +86,7 @@ export default function AgentDecisionsPage() {
     for (let i = 0; i < 48; i++) {                   // max ~2 min, every 2.5s
       await new Promise(r => setTimeout(r, 2500));
       try {
-        const res  = await fetch(`${API_BASE}/status/${job_id}`);
+        const res = await fetch(`${API_BASE}/status/${job_id}`);
         const data = await res.json();
         if (data.status === 'done' || data.status === 'error') {
           return data.details;
@@ -98,27 +100,27 @@ export default function AgentDecisionsPage() {
   const triggerAgent = async (e) => {
     if (e) e.preventDefault();
     if (!userPrompt.trim() && !agentRunning) {
-        // Allow blank for general scan
+      // Allow blank for general scan
     } else if (!userPrompt.trim()) return;
 
     const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const userMsg = userPrompt.trim() || "Run general grid scan";
-    
+
     setMessages(prev => [...prev, { role: 'user', text: userMsg, timestamp: ts }]);
     setUserPrompt('');
     setAgentRunning(true);
 
     try {
       const body = userMsg !== "Run general grid scan" ? { prompt: userMsg } : {};
-      const res  = await fetch(`${API_BASE}/trigger`, {
+      const res = await fetch(`${API_BASE}/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const { job_id } = await res.json();
       const result = await pollJobResult(job_id);
-      const reply  = result?.final_response;
-      
+      const reply = result?.final_response;
+
       if (reply) {
         setMessages(prev => [...prev, { role: 'agent', text: reply, timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
       } else if (!result) {
@@ -139,33 +141,33 @@ export default function AgentDecisionsPage() {
         body: JSON.stringify(feedbackData),
       });
       setModalState({ isOpen: false, proposal: null, mode: null });
-      
+
       const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      const actionLabel = feedbackData.status === 'accepted' ? 'Accepted' : 
-                          feedbackData.status === 'rejected' ? 'Rejected' : 'Overridden';
-      
-      setMessages(prev => [...prev, { 
-        role: 'agent', 
-        text: `Action Confirmed: ${actionLabel} ${currentProposal?.action_type} proposal ${currentProposal?.id}. Log entry created in grid database.`, 
-        timestamp: ts 
+      const actionLabel = feedbackData.status === 'accepted' ? 'Accepted' :
+        feedbackData.status === 'rejected' ? 'Rejected' : 'Overridden';
+
+      setMessages(prev => [...prev, {
+        role: 'agent',
+        text: `Action Confirmed: ${actionLabel} ${currentProposal?.action_type} proposal ${currentProposal?.id}. Log entry created in grid database.`,
+        timestamp: ts
       }]);
-      
+
       await fetchProposals();
 
       if (feedbackData.status === 'overridden' && feedbackData.reason) {
         const overridePrompt = `I am rejecting your previous proposal (${currentProposal?.id}). Reason: ${feedbackData.reason}. Please generate a NEW proposal taking this exact feedback into account.`;
         setMessages(prev => [...prev, { role: 'user', text: overridePrompt, timestamp: ts }]);
-        
+
         setAgentRunning(true);
         try {
-          const res  = await fetch(`${API_BASE}/trigger`, {
+          const res = await fetch(`${API_BASE}/trigger`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt: overridePrompt }),
           });
           const { job_id } = await res.json();
           const result = await pollJobResult(job_id);
-          const reply  = result?.final_response;
+          const reply = result?.final_response;
           if (reply) {
             setMessages(prev => [...prev, { role: 'agent', text: reply, timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
           }
@@ -213,10 +215,10 @@ export default function AgentDecisionsPage() {
 
       {/* ── Main content area ───────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "32px", flex: 1, minHeight: 0 }}>
-        
+
         {/* Left Column: Proposals & Telemetry */}
         <div style={{ display: "flex", flexDirection: "column", gap: "32px", overflowY: "auto", paddingRight: "12px" }}>
-          
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             <Card
               title="Generation"
@@ -271,9 +273,9 @@ export default function AgentDecisionsPage() {
         </div>
 
         {/* Right Column: Chat Window */}
-        <aside style={{ 
-          background: "var(--surface)", 
-          border: "1px solid var(--surface-border)", 
+        <aside style={{
+          background: "var(--surface)",
+          border: "1px solid var(--surface-border)",
           borderRadius: "var(--radius)",
           display: "flex",
           flexDirection: "column",
@@ -285,7 +287,7 @@ export default function AgentDecisionsPage() {
             <h4 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>
               Prometheus Intelligence Chat
             </h4>
-            <button 
+            <button
               onClick={() => { setMessages(defaultMessages); sessionStorage.removeItem('prometheus_chat'); }}
               style={{ background: "transparent", border: "1px solid var(--surface-border)", borderRadius: "4px", color: "var(--muted)", fontSize: "10px", fontWeight: "600", padding: "4px 8px", cursor: "pointer", transition: "all 0.2s" }}
               onMouseOver={(e) => e.target.style.background = 'var(--surface)'}
@@ -298,14 +300,14 @@ export default function AgentDecisionsPage() {
           {/* Messages Area */}
           <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
             {messages.map((msg, i) => (
-              <div key={i} style={{ 
+              <div key={i} style={{
                 alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
                 maxWidth: "85%",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start'
               }}>
-                <div style={{ 
+                <div style={{
                   background: msg.role === 'user' ? 'var(--primary)' : 'var(--accent)',
                   color: msg.role === 'user' ? 'white' : 'var(--foreground)',
                   padding: "12px 16px",
@@ -321,16 +323,16 @@ export default function AgentDecisionsPage() {
                 </span>
               </div>
             ))}
-            
+
             {agentRunning && (
-              <div style={{ 
+              <div style={{
                 alignSelf: 'flex-start',
                 maxWidth: "85%",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: 'flex-start'
               }}>
-                <div style={{ 
+                <div style={{
                   background: 'var(--accent)',
                   color: 'var(--foreground)',
                   padding: "16px 24px",
@@ -413,31 +415,6 @@ export default function AgentDecisionsPage() {
           onSubmit={handleModalSubmit}
         />
       )}
-
-      <style jsx>{`
-        @keyframes spin  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .dot-typing {
-          position: relative;
-          left: -9999px;
-          width: 6px;
-          height: 6px;
-          border-radius: 5px;
-          background-color: var(--primary);
-          color: var(--primary);
-          box-shadow: 9984px 0 0 0 var(--primary), 9999px 0 0 0 var(--primary), 10014px 0 0 0 var(--primary);
-          animation: dot-typing 1.5s infinite linear;
-        }
-        @keyframes dot-typing {
-          0% { box-shadow: 9984px 0 0 0 var(--primary), 9999px 0 0 0 var(--primary), 10014px 0 0 0 var(--primary); }
-          16.667% { box-shadow: 9984px -6px 0 0 var(--primary), 9999px 0 0 0 var(--primary), 10014px 0 0 0 var(--primary); }
-          33.333% { box-shadow: 9984px 0 0 0 var(--primary), 9999px 0 0 0 var(--primary), 10014px 0 0 0 var(--primary); }
-          50% { box-shadow: 9984px 0 0 0 var(--primary), 9999px -6px 0 0 var(--primary), 10014px 0 0 0 var(--primary); }
-          66.667% { box-shadow: 9984px 0 0 0 var(--primary), 9999px 0 0 0 var(--primary), 10014px 0 0 0 var(--primary); }
-          83.333% { box-shadow: 9984px 0 0 0 var(--primary), 9999px 0 0 0 var(--primary), 10014px -6px 0 0 var(--primary); }
-          100% { box-shadow: 9984px 0 0 0 var(--primary), 9999px 0 0 0 var(--primary), 10014px 0 0 0 var(--primary); }
-        }
-      `}</style>
     </div>
   );
 }

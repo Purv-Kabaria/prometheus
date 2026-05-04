@@ -6,10 +6,10 @@ import Card from '../components/Card';
 import ProposalCard from '../components/agent/ProposalCard';
 import FeedbackModal from '../components/agent/FeedbackModal';
 
-const API_BASE    = 'http://localhost:8000/api/agent';
-const FORECAST_API = 'http://localhost:8000/api/forecast/24h';
-const GEN_API      = 'http://localhost:8000/api/live-comparison/generation';
-const SUMMARY_API  = 'http://localhost:8000/api/reports/today-summary';
+const API_BASE    = 'http://127.0.0.1:8000/api/agent';
+const FORECAST_API = 'http://127.0.0.1:8000/api/forecast/24h';
+const GEN_API      = 'http://127.0.0.1:8000/api/live-comparison/generation';
+const SUMMARY_API  = 'http://127.0.0.1:8000/api/reports/today-summary';
 
 export default function GridOfficerDashboard() {
   const [proposals, setProposals] = useState([]);
@@ -294,13 +294,6 @@ export default function GridOfficerDashboard() {
           onSubmit={handleModalSubmit}
         />
       )}
-      
-      <style jsx>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
