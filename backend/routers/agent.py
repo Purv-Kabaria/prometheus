@@ -90,6 +90,33 @@ def submit_feedback(req: FeedbackRequest):
     if req.overridden_mwh:
         updates["overridden_mwh"] = req.overridden_mwh
 
+    # ── Dynamic Simulation Hook ────────────────────────────────────────────────
+    # If the officer accepts a maintenance proposal, actually perform the maintenance
+    # by resetting the `last_maintained` date for that equipment to today!
+    if req.status == "accepted":
+        # Load the proposal to see what action it was
+        proposals = load_proposals()
+        proposal = next((p for p in proposals if p["id"] == req.proposal_id), None)
+        if proposal and proposal.get("action_type") == "maintenance":
+            # The agent outputs equipment_id at the root level of the proposal
+            eq_id = proposal.get("equipment_id")
+            if eq_id:
+                try:
+                    import json
+                    eq_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "equipment.json")
+                    with open(eq_file, "r") as f:
+                        eq_data = json.load(f)
+                    for eq in eq_data:
+                        if eq["id"] == eq_id:
+                            eq["last_maintained"] = datetime.now().strftime("%Y-%m-%d")
+                            break
+                    with open(eq_file, "w") as f:
+                        json.dump(eq_data, f, indent=2)
+                    print(f"[SIMULATION] Maintenance applied to {eq_id}. Health reset to 100%.")
+                except Exception as e:
+                    print(f"[SIMULATION] Failed to update equipment.json: {e}")
+    # ──────────────────────────────────────────────────────────────────────────
+
     success = update_proposal(req.proposal_id, updates)
     if success:
         return {"status": "success", "message": f"Proposal {req.proposal_id} resolved as {req.status}."}
