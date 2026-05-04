@@ -1,0 +1,14 @@
+{
+  "status": "done",
+  "updated_at": "2026-05-04T02:21:26.759405+00:00",
+  "job_id": "775312fe-862c-4d21-808e-736bdb408597",
+  "mape": "112.72%",
+  "elapsed_s": 2.37,
+  "artefacts": [
+    "D:\\Aayush\\Projects\\powermind_adani_hackthon\\backend\\models\\v4\\final_prefix_tcn_weights.pth",
+    "D:\\Aayush\\Projects\\powermind_adani_hackthon\\backend\\models\\v4\\final_prefix_xgb_corrector.json",
+    "D:\\Aayush\\Projects\\powermind_adani_hackthon\\backend\\models\\v4\\final_prefix_scaler_X.pkl",
+    "D:\\Aayush\\Projects\\powermind_adani_hackthon\\backend\\models\\v4\\final_prefix_scaler_y.pkl",
+    "D:\\Aayush\\Projects\\powermind_adani_hackthon\\backend\\models\\v4\\final_prefix_metadata.json"
+  ]
+}

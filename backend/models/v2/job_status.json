@@ -1,0 +1,14 @@
+{
+  "status": "done",
+  "updated_at": "2026-05-03T18:15:21.369312+00:00",
+  "job_id": "test-001",
+  "mape": "123.47%",
+  "elapsed_s": 2.97,
+  "artefacts": [
+    "models\\v2\\final_prefix_tcn_weights.pth",
+    "models\\v2\\final_prefix_xgb_corrector.json",
+    "models\\v2\\final_prefix_scaler_X.pkl",
+    "models\\v2\\final_prefix_scaler_y.pkl",
+    "models\\v2\\final_prefix_metadata.json"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "features": [
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "lag_1h",
+    "lag_24h",
+    "lag_168h",
+    "roll_mean_24h",
+    "roll_std_24h",
+    "diff_1h"
+  ],
+  "target": "consumption",
+  "window_size": 11,
+  "mape_achieved": "118.17%",
+  "parent_version": "v4",
+  "trained_on": "D:\\Aayush\\Projects\\powermind_adani_hackthon\\backend\\data\\uploads\\20260504T022254_test_upload_2.csv",
+  "trained_at": "2026-05-04T02:23:11.347546+00:00",
+  "epochs": 2,
+  "n_sequences": 1,
+  "freeze_backbone": true,
+  "xgb_trees": 30,
+  "device": "cpu"
+}

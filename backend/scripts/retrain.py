@@ -339,7 +339,7 @@ def retrain(
     residuals = y_actual - tcn_preds
     log(f"Residuals   : mean={residuals.mean():.3f}  std={residuals.std():.3f}", step="XGB")
 
-    new_xgb_path = parent_dir / "final_prefix_xgb_corrector.json"
+    new_xgb_path = version_dir / "final_prefix_xgb_corrector.json"
 
     if HAS_XGB and n_seq >= 3:   # XGB needs at least a few samples
         xgb_model = xgb.XGBRegressor(
@@ -362,7 +362,7 @@ def retrain(
             log("xgboost not installed — copying parent XGB unchanged.", step="XGB")
         else:
             log(f"Too few sequences ({n_seq}) for XGB — copying parent unchanged.", step="XGB")
-        if xgb_path.exists():
+        if xgb_path.exists() and xgb_path != new_xgb_path:
             shutil.copy(xgb_path, new_xgb_path)
         final_preds = tcn_preds
 
@@ -374,18 +374,19 @@ def retrain(
     ) if nonzero.any() else 0.0
     log(f"MAPE on new data: {mape:.2f}%", step="EVAL")
 
-    new_tcn_path  = parent_dir / "final_prefix_tcn_weights.pth"
-    new_sX_path   = parent_dir / "final_prefix_scaler_X.pkl"
-    new_sy_path   = parent_dir / "final_prefix_scaler_y.pkl"
-    new_meta_path = parent_dir / "final_prefix_metadata.json"
+    # Save to version_dir — each version gets its own complete set of artefacts
+    new_tcn_path  = version_dir / "final_prefix_tcn_weights.pth"
+    new_sX_path   = version_dir / "final_prefix_scaler_X.pkl"
+    new_sy_path   = version_dir / "final_prefix_scaler_y.pkl"
+    new_meta_path = version_dir / "final_prefix_metadata.json"
 
     torch.save(model.state_dict(), new_tcn_path)
     log(f"✓ TCN weights → {new_tcn_path.name}", step="SAVE")
 
     with open(new_sX_path, "wb") as f:
-        pickle.dump(scaler_X, f)
+        pickle.dump(scaler_X, f, protocol=4)
     with open(new_sy_path, "wb") as f:
-        pickle.dump(scaler_y, f)
+        pickle.dump(scaler_y, f, protocol=4)
     log("✓ Scalers saved", step="SAVE")
 
     metadata = {
@@ -405,6 +406,11 @@ def retrain(
     new_meta_path.write_text(json.dumps(metadata, indent=2))
     log(f"✓ Metadata saved → {new_meta_path.name}", step="SAVE")
 
+    # Also update final_submission/ so the NEXT retrain loads these latest weights
+    for src in [new_tcn_path, new_sX_path, new_sy_path, new_xgb_path, new_meta_path]:
+        shutil.copy(src, parent_dir / src.name)
+    log("✓ Artefacts promoted to final_submission/", step="SAVE")
+
     # ── 7. Update registry ────────────────────────────────────────────────────
     section("STEP 7/7 · Updating registry")
     with open(registry_path) as f:
@@ -417,7 +423,7 @@ def retrain(
         "data_file":     str(data_path),
         "mape":          f"{mape:.2f}%",
         "job_id":        job_id,
-        "artefact_dir":  str(parent_dir),
+        "artefact_dir":  str(version_dir),
         "n_sequences":   n_seq,
     }
     tmp = registry_path.with_suffix(".tmp")
@@ -426,7 +432,7 @@ def retrain(
     log(f"✓ Registry updated. Active version: {new_version}", step="REG")
 
     elapsed_total = time.monotonic() - _t0
-    section(f"✅  DONE  ({elapsed_total:.1f}s total)")
+    section(f"  DONE  ({elapsed_total:.1f}s total)")
     log(f"{parent_version} → {new_version}  |  MAPE {mape:.2f}%  |  {n_seq} sequences")
 
     write_job_status(version_dir, "done", {
