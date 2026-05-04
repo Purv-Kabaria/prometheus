@@ -29,8 +29,9 @@ export default function RootLayout({ children }) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${crimsonPro.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full bg-[var(--background)] text-[var(--foreground)] m-0">
+      <body className="min-h-full bg-[var(--background)] text-[var(--foreground)] m-0" suppressHydrationWarning>
         <AnomalyAlertBar />
         <div style={{ display: "flex", minHeight: "100vh" }}>
           <Sidebar />

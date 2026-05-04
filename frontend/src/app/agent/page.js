@@ -14,11 +14,7 @@ export default function AgentDecisionsPage() {
   const [proposals, setProposals]     = useState([]);
   const [agentRunning, setAgentRunning] = useState(false);
   const [userPrompt, setUserPrompt]   = useState('');
-  const defaultMessages = [
-    { role: 'agent', text: 'Prometheus Intelligence online. I am monitoring the grid for imbalances and maintenance opportunities. How can I assist you today?', timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }
-  ];
-  
-  const [messages, setMessages]       = useState(defaultMessages);
+  const [messages, setMessages]       = useState([]);
   const [modalState, setModalState]   = useState({ isOpen: false, proposal: null, mode: null });
   const [telemetry, setTelemetry]     = useState({ demand: null, generation: null });
   const [stats, setStats]             = useState({ total: 0, accepted: 0, rejected: 0, overridden: 0 });
@@ -32,8 +28,14 @@ export default function AgentDecisionsPage() {
   useEffect(() => {
     const saved = sessionStorage.getItem('prometheus_chat');
     if (saved) {
-      try { setMessages(JSON.parse(saved)); } catch (e) {}
+      try { 
+        setMessages(JSON.parse(saved)); 
+        return;
+      } catch (e) {}
     }
+    setMessages([
+      { role: 'agent', text: 'Prometheus Intelligence online. I am monitoring the grid for imbalances and maintenance opportunities. How can I assist you today?', timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }
+    ]);
   }, []);
 
   useEffect(() => {
@@ -288,7 +290,11 @@ export default function AgentDecisionsPage() {
               Prometheus Intelligence Chat
             </h4>
             <button 
-              onClick={() => { setMessages(defaultMessages); sessionStorage.removeItem('prometheus_chat'); }}
+              onClick={() => { 
+                const defaultMsg = [{ role: 'agent', text: 'Prometheus Intelligence online. I am monitoring the grid for imbalances and maintenance opportunities. How can I assist you today?', timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }];
+                setMessages(defaultMsg); 
+                sessionStorage.removeItem('prometheus_chat'); 
+              }}
               style={{ background: "transparent", border: "1px solid var(--surface-border)", borderRadius: "4px", color: "var(--muted)", fontSize: "10px", fontWeight: "600", padding: "4px 8px", cursor: "pointer", transition: "all 0.2s" }}
               onMouseOver={(e) => e.target.style.background = 'var(--surface)'}
               onMouseOut={(e) => e.target.style.background = 'transparent'}

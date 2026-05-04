@@ -282,12 +282,13 @@ def _adani_features(hour: int, weekday: int) -> list:
     diff_24 = 0
     rolling_max_24 = base * 1.05
     rolling_max_168 = base * 1.05
+    covid_severity = 0
 
     return [
         dayofweek, is_weekend, hour_sin, hour_cos, month_sin, month_cos,
         lag_1, lag_24, lag_168, rolling_mean_24, rolling_std_24,
         is_business_hour, is_holiday, ema_12, ema_24, diff_1, diff_24,
-        rolling_max_24, rolling_max_168
+        rolling_max_24, rolling_max_168, covid_severity
     ]
 
 
@@ -391,7 +392,7 @@ def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
             mock_date = mock_date.replace(hour=hour, minute=0, second=0, microsecond=0)
             
             feat = np.array([_adani_features(hour, weekday)])
-            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168']
+            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168', 'covid_severity']
             df = pd.DataFrame(feat, columns=feature_names)
             df['ds'] = [mock_date]
             
@@ -399,7 +400,7 @@ def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
             p50 = float(pred['yhat'].iloc[0])
         else:
             feat = np.array([_adani_features(hour, weekday)])
-            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168']
+            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168', 'covid_severity']
             df = pd.DataFrame(feat, columns=feature_names)
             p50 = float(model.predict(df)[0])
             
