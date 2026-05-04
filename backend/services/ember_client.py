@@ -57,7 +57,7 @@ class EmberAPIClient:
             # Generate hourly timeline
             start_dt = pd.to_datetime(start_date)
             end_dt = pd.to_datetime(end_date)
-            hourly_idx = pd.date_range(start=start_dt, end=end_dt, freq="H")
+            hourly_idx = pd.date_range(start=start_dt, end=end_dt, freq="h")
             
             hourly_df = pd.DataFrame(index=hourly_idx)
             hourly_df.reset_index(inplace=True)
