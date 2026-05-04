@@ -186,12 +186,9 @@ def retrain(
     version_dir.mkdir(parents=True, exist_ok=True)
     write_job_status(version_dir, "running", {"job_id": job_id})
 
-    # ── 1. Resolve parent directory ──────────────────────────────────────────
+    # ── 1. Load artefacts — always from final_submission ─────────────────────
     section("STEP 1/7 · Loading parent artefacts")
-    parent_dir = model_dir / "final_submission"   # baseline fallback
-    candidate  = model_dir / parent_version
-    if candidate.exists() and any(candidate.iterdir()):
-        parent_dir = candidate
+    parent_dir = model_dir / "final_submission"
     log(f"Parent dir : {parent_dir}", step="LOAD")
 
     scaler_X_path = parent_dir / "final_prefix_scaler_X.pkl"
@@ -342,7 +339,7 @@ def retrain(
     residuals = y_actual - tcn_preds
     log(f"Residuals   : mean={residuals.mean():.3f}  std={residuals.std():.3f}", step="XGB")
 
-    new_xgb_path = version_dir / "final_prefix_xgb_corrector.json"
+    new_xgb_path = parent_dir / "final_prefix_xgb_corrector.json"
 
     if HAS_XGB and n_seq >= 3:   # XGB needs at least a few samples
         xgb_model = xgb.XGBRegressor(
@@ -377,10 +374,10 @@ def retrain(
     ) if nonzero.any() else 0.0
     log(f"MAPE on new data: {mape:.2f}%", step="EVAL")
 
-    new_tcn_path  = version_dir / "final_prefix_tcn_weights.pth"
-    new_sX_path   = version_dir / "final_prefix_scaler_X.pkl"
-    new_sy_path   = version_dir / "final_prefix_scaler_y.pkl"
-    new_meta_path = version_dir / "final_prefix_metadata.json"
+    new_tcn_path  = parent_dir / "final_prefix_tcn_weights.pth"
+    new_sX_path   = parent_dir / "final_prefix_scaler_X.pkl"
+    new_sy_path   = parent_dir / "final_prefix_scaler_y.pkl"
+    new_meta_path = parent_dir / "final_prefix_metadata.json"
 
     torch.save(model.state_dict(), new_tcn_path)
     log(f"✓ TCN weights → {new_tcn_path.name}", step="SAVE")
@@ -420,7 +417,7 @@ def retrain(
         "data_file":     str(data_path),
         "mape":          f"{mape:.2f}%",
         "job_id":        job_id,
-        "artefact_dir":  str(version_dir),
+        "artefact_dir":  str(parent_dir),
         "n_sequences":   n_seq,
     }
     tmp = registry_path.with_suffix(".tmp")

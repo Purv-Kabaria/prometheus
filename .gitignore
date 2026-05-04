@@ -12,3 +12,5 @@ backend/proposals_db.json
 backend/proposals.db
 backend/data/reports/*.pdf
 backend/data/uploads/
+
+*.docker-compose.yml

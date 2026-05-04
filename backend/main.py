@@ -1,4 +1,6 @@
 import logging
+import warnings
+warnings.filterwarnings("ignore")
 import os
 import json
 from datetime import datetime, timezone

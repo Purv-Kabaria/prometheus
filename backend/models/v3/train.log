@@ -1,0 +1,16 @@
+[01:34:38] (+  0.0s) 🚀 Prometheus retrain started  job=65c11806-9bbe-4be9-8232-0fcdfe9d6abe
+[01:34:38] (+  0.0s)    new=v3  parent=v2
+[01:34:38] (+  0.0s)    epochs=2  batch=32  lr=5e-05  xgb_trees=30
+[01:34:38] (+  0.0s)    freeze_backbone=True
+
+──────────────────────────────────────────────────
+  STEP 1/7 · Loading parent artefacts
+──────────────────────────────────────────────────
+[01:34:38] (+  0.0s) [LOAD] Parent dir : D:\CODING\ps1_promtheus\backend\models\v2
+[01:34:38] (+  0.0s) ❌ Retrain FAILED:
+Traceback (most recent call last):
+  File "D:\CODING\ps1_promtheus\backend\scripts\retrain.py", line 477, in <module>
+    retrain(
+  File "D:\CODING\ps1_promtheus\backend\scripts\retrain.py", line 202, in retrain
+    with open(scaler_X_path, "rb") as f:
+FileNotFoundError: [Errno 2] No such file or directory: 'D:\\CODING\\ps1_promtheus\\backend\\models\\v2\\final_prefix_scaler_X.pkl'

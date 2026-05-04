@@ -9,7 +9,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Tuple
 
-MODELS_ROOT = Path(__file__).parent.parent / "models"
+MODELS_ROOT = Path(__file__).parent.parent / "models" / "forecasting"
+
 _LGBM_PATHS = {
     "p10": MODELS_ROOT / "prometheus_lgbm_P10.pkl",
     "p50": MODELS_ROOT / "prometheus_lgbm_P50.pkl",
@@ -17,6 +18,7 @@ _LGBM_PATHS = {
 }
 
 _models: dict = {}
+
 
 HOUR_PROFILE = [
     0.52, 0.50, 0.48, 0.47, 0.48, 0.53,
@@ -33,13 +35,22 @@ def _load_models() -> dict:
     if _models:
         return _models
     try:
-        for q, path in _LGBM_PATHS.items():
-            if path.exists():
+        if all(p.exists() for p in _LGBM_PATHS.values()):
+            for q, path in _LGBM_PATHS.items():
                 with open(path, "rb") as f:
                     _models[q] = pickle.load(f)
+        else:
+            fallback_path = MODELS_ROOT / "adani_lightgbm_model.pkl"
+            if fallback_path.exists():
+                with open(fallback_path, "rb") as f:
+                    model = pickle.load(f)
+                _models["p10"] = model
+                _models["p50"] = model
+                _models["p90"] = model
     except Exception as e:
         print(f"[inference] Model load failed: {e} — using synthetic fallback")
     return _models
+
 
 
 def _synthetic(hour: int, weekday: int) -> Tuple[float, float, float]:
