@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
+import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +26,8 @@ Z_THRESHOLD_HIGH = 3.5
 ROLLBACK = 168
 MIN_PRIOR = 12
 
+_ANOMALY_LOG_LOCK = threading.Lock()
+
 
 def _ollama_config() -> tuple[str, str]:
     host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
@@ -34,9 +39,44 @@ def _ollama_config() -> tuple[str, str]:
 
 def _atomic_write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    payload = json.dumps(data, indent=2)
+    tmp = path.parent / f"{path.stem}.{uuid.uuid4().hex}.tmp"
+    tmp.write_text(payload, encoding="utf-8")
+
+    def _access_denied(exc: OSError) -> bool:
+        if isinstance(exc, PermissionError):
+            return True
+        if getattr(exc, "winerror", None) == 5:
+            return True
+        return exc.errno in (13, 16)
+
+    for attempt in range(16):
+        try:
+            os.replace(tmp, path)
+            return
+        except OSError as e:
+            if _access_denied(e):
+                time.sleep(0.025 * (attempt + 1))
+                continue
+            raise
+
+    for attempt in range(12):
+        try:
+            if path.exists():
+                path.unlink()
+            tmp.rename(path)
+            return
+        except OSError as e:
+            if _access_denied(e):
+                time.sleep(0.035 * (attempt + 1))
+                continue
+            raise
+
+    shutil.copyfile(tmp, path)
+    try:
+        tmp.unlink()
+    except OSError:
+        pass
 
 
 def load_anomaly_log() -> List[Dict[str, Any]]:
@@ -52,7 +92,8 @@ def load_anomaly_log() -> List[Dict[str, Any]]:
 
 
 def save_anomaly_log(entries: List[Dict[str, Any]]) -> None:
-    _atomic_write_json(ANOMALIES_PATH, entries)
+    with _ANOMALY_LOG_LOCK:
+        _atomic_write_json(ANOMALIES_PATH, entries)
 
 
 def _existing_keys(entries: List[Dict[str, Any]]) -> set:
