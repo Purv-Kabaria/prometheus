@@ -2,8 +2,10 @@
 
 import Card from "@/components/Card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useIsClient } from "@/hooks/useIsClient";
 
 export default function InsightsPage() {
+  const isClient = useIsClient();
   // Derived from notebook SHAP waterfall output (forecasting_models.ipynb, viz_30)
   // Values are absolute SHAP magnitudes converted to percentage share.
   const shapRawImpacts = [
@@ -49,6 +51,7 @@ export default function InsightsPage() {
           </div>
           
           <div style={{ height: 320 }}>
+            {isClient ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart layout="vertical" data={shapData} margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--surface-border)" />
@@ -58,6 +61,7 @@ export default function InsightsPage() {
                 <Bar dataKey="contribution" name="Contribution %" fill="var(--primary)" barSize={20} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            ) : <div style={{ width: "100%", height: "100%", minHeight: 320 }} />}
           </div>
         </div>
 

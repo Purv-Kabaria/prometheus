@@ -7,6 +7,7 @@ import {
   Brush,
 } from "recharts";
 import Card from "@/components/Card";
+import { useIsClient } from "@/hooks/useIsClient";
 
 const API = "http://localhost:8000";
 const REALIZED_TARIFF_DEFAULT = 3.09; // INR per kWh
@@ -135,7 +136,8 @@ const CustomTooltip = ({ active, payload, label }) => {
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function ReportingPage() {
   const [loading, setLoading] = useState(true);
-  
+  const isClient = useIsClient();
+
   // State
   const [freq, setFreq] = useState("W"); // H, D, W, M
   const [historyData, setHistoryData] = useState([]);
@@ -307,6 +309,7 @@ export default function ReportingPage() {
         </div>
 
         <div style={{ height: 420 }}>
+          {isClient ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 5, right: 24, left: -20, bottom: 0 }}>
               <defs>
@@ -355,6 +358,7 @@ export default function ReportingPage() {
 
             </ComposedChart>
           </ResponsiveContainer>
+          ) : <div style={{ width: "100%", height: "100%", minHeight: 420 }} />}
         </div>
       </div>
 

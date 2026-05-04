@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useIsClient } from "@/hooks/useIsClient";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
@@ -148,9 +149,11 @@ function ModelSelector({ models, activeModel, onChange, loading }) {
 
 // ─── 24h Forecast Panel ───────────────────────────────────────────────────────
 function Forecast24h({ data, models }) {
-  if (!data || !data.slots) return <Spinner />;
-  const { slots = [], summary = {}, model } = data;
+  const isClient = useIsClient();
+  if (!data) return <Spinner />;
+  const { slots, summary, model } = data;
   const isAll = model === "all";
+  const modelColor = MODEL_COLORS[model]?.accent || "var(--primary)";
 
   const chartData = slots.map(s => {
     const p = {
@@ -185,12 +188,13 @@ function Forecast24h({ data, models }) {
       </div>
       
       <div style={{ height: 360, marginBottom: "48px" }}>
+        {isClient ? (
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="bandFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="var(--primary)" stopOpacity={0.1} />
-                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                <stop offset="5%"  stopColor={modelColor} stopOpacity={0.1} />
+                <stop offset="95%" stopColor={modelColor} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--surface-border)" />
@@ -201,8 +205,8 @@ function Forecast24h({ data, models }) {
             <ReferenceLine y={16500} stroke="var(--danger)" strokeDasharray="4 2"
               label={{ value: "Grid Capacity", fill: "var(--danger)", fontSize: 10, position: "insideTopRight", fontWeight: "700" }} />
             
-            {!isAll && <Area type="monotone" dataKey="p90" name="P90" stroke="var(--primary)" strokeWidth={1} fill="url(#bandFill)" strokeOpacity={0.2} strokeDasharray="4 2" />}
-            {!isAll && <Area type="monotone" dataKey="p10" name="P10" stroke="var(--primary)" strokeWidth={1} fill="none" strokeOpacity={0.2} strokeDasharray="4 2" />}
+            {!isAll && <Area type="monotone" dataKey="p90" name="P90" stroke={modelColor} strokeWidth={1} fill="url(#bandFill)" strokeOpacity={0.2} strokeDasharray="4 2" />}
+            {!isAll && <Area type="monotone" dataKey="p10" name="P10" stroke={modelColor} strokeWidth={1} fill="none" strokeOpacity={0.2} strokeDasharray="4 2" />}
             
             {isAll ? (
               Object.keys(chartData[0] || {}).filter(k => k.endsWith("_p50")).map((key, i) => {
@@ -214,10 +218,11 @@ function Forecast24h({ data, models }) {
                 return <Area key={key} type="monotone" dataKey={key} name={displayName} stroke={color} strokeWidth={2} fill="none" dot={false} />;
               })
             ) : (
-              <Area type="monotone" dataKey="p50" name="P50 (median)" stroke="var(--primary)" strokeWidth={2.5} fill="none" dot={false} />
+              <Area type="monotone" dataKey="p50" name="P50 (median)" stroke={modelColor} strokeWidth={2.5} fill="none" dot={false} />
             )}
           </AreaChart>
         </ResponsiveContainer>
+        ) : <div style={{ width: "100%", height: "100%", minHeight: 360 }} />}
       </div>
 
       <div style={{ overflowX: "auto" }}>
@@ -239,7 +244,7 @@ function Forecast24h({ data, models }) {
                 <td style={{ padding: "12px 10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <div style={{ width: "60px", height: "4px", background: "var(--surface-border)", borderRadius: "2px", overflow: "hidden" }}>
-                      <div style={{ width: `${s.confidence * 100}%`, height: "100%", background: "var(--primary)", opacity: 0.8 }} />
+                      <div style={{ width: `${s.confidence * 100}%`, height: "100%", background: modelColor, opacity: 0.8 }} />
                     </div>
                     <span style={{ color: "var(--muted)", fontSize: "10px" }}>{(s.confidence * 100).toFixed(0)}%</span>
                   </div>
@@ -258,11 +263,12 @@ function Forecast24h({ data, models }) {
 }
 
 // ─── 7-Day Forecast Panel ─────────────────────────────────────────────────────
-function Forecast7Day({ data }) {
-  if (!data || !data.days) return <Spinner />;
-  const days = data.days || [];
-  const summary = data.summary || {};
+function Forecast7Day({ data, activeModel }) {
+  const isClient = useIsClient();
+  if (!data) return <Spinner />;
+  const { days, summary } = data;
   const chartData = days.map(d => ({ label: d.day_name, peak: d.peak_mw, mean: d.mean_mw, trough: d.trough_mw }));
+  const modelColor = MODEL_COLORS[activeModel]?.accent || "var(--primary)";
 
   return (
     <>
@@ -282,16 +288,18 @@ function Forecast7Day({ data }) {
         <Card title="Critical Window" value={`${summary.procurement_days ? summary.procurement_days.length : 0} days`} subtext="High-procurement period" accentColor="var(--danger)" />
       </div>
       <div style={{ height: 320, marginBottom: "48px" }}>
+        {isClient ? (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--surface-border)" />
             <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 11 }} />
             <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} tickFormatter={fmt} />
             <Tooltip content={<ChartTooltip />} />
-            <Bar dataKey="peak" name="Peak Demand" fill="var(--primary)" radius={[4,4,0,0]} barSize={32} />
-            <Bar dataKey="mean" name="Mean Demand" fill="var(--primary)" opacity={0.15} radius={[4,4,0,0]} barSize={32} />
+            <Bar dataKey="peak" name="Peak Demand" fill={modelColor} radius={[4,4,0,0]} barSize={32} />
+            <Bar dataKey="mean" name="Mean Demand" fill={modelColor} opacity={0.15} radius={[4,4,0,0]} barSize={32} />
           </BarChart>
         </ResponsiveContainer>
+        ) : <div style={{ width: "100%", height: "100%", minHeight: 320 }} />}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "16px" }}>
         {days.map(d => (
@@ -312,11 +320,12 @@ function Forecast7Day({ data }) {
 }
 
 // ─── 30-Day Forecast Panel ───────────────────────────────────────────────────
-function Forecast30Day({ data }) {
-  if (!data || !data.days) return <Spinner />;
-  const days = data.days || [];
-  const summary = data.summary || {};
+function Forecast30Day({ data, activeModel }) {
+  const isClient = useIsClient();
+  if (!data) return <Spinner />;
+  const { days, summary } = data;
   const chartData = days.map(d => ({ label: d.day_name, date: d.date, peak: d.peak_mw, mean: d.mean_mw, trough: d.trough_mw }));
+  const modelColor = MODEL_COLORS[activeModel]?.accent || "var(--primary)";
 
   return (
     <>
@@ -336,16 +345,18 @@ function Forecast30Day({ data }) {
         <Card title="Critical Window" value={`${summary.procurement_days ? summary.procurement_days.length : 0} days`} subtext="High-procurement period" accentColor="var(--danger)" />
       </div>
       <div style={{ height: 320, marginBottom: "48px" }}>
+        {isClient ? (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--surface-border)" />
             <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 9 }} interval={4} />
             <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} tickFormatter={fmt} />
             <Tooltip content={<ChartTooltip />} />
-            <Bar dataKey="peak" name="Peak Demand" fill="var(--primary)" radius={[4,4,0,0]} barSize={20} />
-            <Bar dataKey="mean" name="Mean Demand" fill="var(--primary)" opacity={0.15} radius={[4,4,0,0]} barSize={20} />
+            <Bar dataKey="peak" name="Peak Demand" fill={modelColor} radius={[4,4,0,0]} barSize={20} />
+            <Bar dataKey="mean" name="Mean Demand" fill={modelColor} opacity={0.15} radius={[4,4,0,0]} barSize={20} />
           </BarChart>
         </ResponsiveContainer>
+        ) : <div style={{ width: "100%", height: "100%", minHeight: 320 }} />}
       </div>
       <div style={{ overflowX: "auto", maxHeight: "400px", border: "1px solid var(--surface-border)", borderRadius: "12px", background: "var(--surface)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
@@ -529,6 +540,7 @@ function XAIExplainPanel({ activeModel }) {
   const [selectedWeekday, setSelectedWeekday] = useState(0);
   const [explainData, setExplainData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const modelColor = MODEL_COLORS[activeModel]?.accent || "var(--primary)";
 
   useEffect(() => {
     setLoading(true);
@@ -667,14 +679,14 @@ function XAIExplainPanel({ activeModel }) {
                     <div key={i} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
                         <span style={{ fontWeight: "500", color: "var(--foreground)" }}>{item.feature}</span>
-                        <span style={{ fontWeight: "700", color: isPos ? "var(--primary)" : "var(--warning)" }}>
+                        <span style={{ fontWeight: "700", color: isPos ? modelColor : "var(--warning)" }}>
                           {isPos ? "+" : ""}{item.coefficient.toFixed(3)}
                         </span>
                       </div>
                       <div style={{ width: "100%", height: "6px", background: "var(--accent)", borderRadius: "3px", overflow: "hidden" }}>
                         <div style={{
                           width: `${pct}%`, height: "100%",
-                          background: isPos ? "var(--primary)" : "var(--warning)",
+                          background: isPos ? modelColor : "var(--warning)",
                           opacity: 0.6,
                           borderRadius: "3px", float: isPos ? "left" : "right"
                         }} />
@@ -812,8 +824,8 @@ export default function ForecastingPage() {
 
       <Panel>
         {tab === "24h"     && <Forecast24h data={data24h} models={models} />}
-        {tab === "7day"    && <Forecast7Day data={data7d} models={models} />}
-        {tab === "30day"   && <Forecast30Day data={data30d} models={models} />}
+        {tab === "7day"    && <Forecast7Day data={data7d} activeModel={activeModel} />}
+        {tab === "30day"   && <Forecast30Day data={data30d} activeModel={activeModel} />}
         {tab === "peak"    && <PeakHours data={dataPeak} />}
         {tab === "offpeak" && <OffPeak data={dataOff} />}
         {tab === "explain" && <XAIExplainPanel activeModel={activeModel} />}
