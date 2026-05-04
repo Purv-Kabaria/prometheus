@@ -35,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 _ROOT = Path(__file__).parent.parent / "models"
+_LGBM_P10  = _ROOT / "prometheus_lgbm_P10.pkl"
+_LGBM_P50  = _ROOT / "prometheus_lgbm_P50.pkl"
+_LGBM_P90  = _ROOT / "prometheus_lgbm_P90.pkl"
 _FS_DIR    = _ROOT / "final_submission"
 _TCN_PH    = _FS_DIR / "final_prefix_tcn_weights.pth"
 _XGB_PH    = _FS_DIR / "final_prefix_xgb_corrector.json"
@@ -567,7 +570,6 @@ def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
         feat_list = []
         for col in feature_names:
             feat_list.append(feat_dict.get(col, 0.0))
-            
         df = pd.DataFrame([feat_list], columns=feature_names)
 
         if model_key == "adani_prophet":
@@ -575,18 +577,10 @@ def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
             days_ahead = (weekday - now.weekday()) % 7
             mock_date = now + timedelta(days=days_ahead)
             mock_date = mock_date.replace(hour=hour, minute=0, second=0, microsecond=0)
-            
-            feat = np.array([_adani_features(hour, weekday)])
-            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168', 'covid_severity']
-            df = pd.DataFrame(feat, columns=feature_names)
             df['ds'] = [mock_date]
-            
             pred = model.predict(df)
             p50 = float(pred['yhat'].iloc[0])
         else:
-            feat = np.array([_adani_features(hour, weekday)])
-            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168', 'covid_severity']
-            df = pd.DataFrame(feat, columns=feature_names)
             p50 = float(model.predict(df)[0])
             
         if model_key == "adani_xgboost" and p50 < 10.0:
@@ -649,5 +643,4 @@ def get_model_registry() -> list:
         })
 
     return registry
-
 

@@ -8,8 +8,9 @@ import {
 } from "recharts";
 import Card from "@/components/Card";
 import { useIsClient } from "@/hooks/useIsClient";
+import { API_BASE } from "@/lib/api";
 
-const API = "http://localhost:8000";
+const API = API_BASE;
 const REALIZED_TARIFF_DEFAULT = 3.09; // INR per kWh
 const OPEX_PER_UNIT = 0.45; // INR per kWh
 const CARBON_CREDIT_RATE = 0.20; // INR per kWh
