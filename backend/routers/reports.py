@@ -6,6 +6,7 @@ GET  /api/reports/today-summary — quick preview card data
 GET  /api/reports/{id}/download — download PDF
 """
 import sqlite3
+import asyncio
 from datetime import datetime
 from pathlib import Path
 
@@ -22,6 +23,7 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 from .model_inference import predict_hourly, get_model_registry
+from services.ember_client import ember_client
 
 LOGO_PATH = Path(__file__).parent.parent / "assets" / "Adani.png"
 REALIZED_TARIFF = 3.09
@@ -89,6 +91,7 @@ def _render_pdf(
         # Use a Unicode font so symbols like ₹ render correctly in generated PDFs.
         font_regular = "Helvetica"
         font_bold = "Helvetica-Bold"
+        currency_unit = "$"
         for regular_path, bold_path in [
             ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
             ("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"),
@@ -98,6 +101,7 @@ def _render_pdf(
                 pdfmetrics.registerFont(TTFont("ReportSans-Bold", bold_path))
                 font_regular = "ReportSans"
                 font_bold = "ReportSans-Bold"
+                currency_unit = "$"
                 break
 
         st["Normal"].fontName = font_regular
@@ -212,8 +216,8 @@ def _render_pdf(
         body.append(Spacer(1, 8))
         health_rows = [
             ["Indicator", "Actual", "Benchmark", "Status"],
-            ["Realized Tariff (₹/kWh)", f"{financials['realized_tariff_observed']:.3f}", f"{REALIZED_TARIFF:.2f}", financials["tariff_status"]],
-            ["Unit O&M Cost (₹/kWh)", f"{financials['opex_per_unit_actual']:.3f}", f"{OPEX_PER_UNIT:.2f}", financials["opex_status"]],
+            [f"Realized Tariff ({currency_unit}/kWh)", f"{financials['realized_tariff_observed']:.3f}", f"{REALIZED_TARIFF:.2f}", financials["tariff_status"]],
+            [f"Unit O&M Cost ({currency_unit}/kWh)", f"{financials['opex_per_unit_actual']:.3f}", f"{OPEX_PER_UNIT:.2f}", financials["opex_status"]],
             ["Transmission Availability (%)", f"{financials['transmission_availability']:.2f}", f"{ASSET_AVAILABILITY_TARGET:.1f}", financials["availability_status"]],
             ["Receivable Cycle (DSO days)", f"{financials['dso_days']:.1f}", f"{DSO_BENCHMARK_DAYS}", financials["financial_health_status"]],
             ["Debt / EBITDA (x)", f"{financials['debt_to_ebitda']:.2f}", f"{DEBT_TO_EBITDA_TARGET:.1f}", financials["investment_grade_status"]],
@@ -245,7 +249,7 @@ def _render_pdf(
         body.append(Paragraph("FINANCIAL WATERFALL", st["Heading2"]))
         body.append(Spacer(1, 8))
         wf_rows = [
-            ["Step", "Amount (₹ Crore)"],
+            [f"Step", f"Amount ({currency_unit} Crore)"],
             ["Gross Revenue", f"{financials['gross_revenue_inr'] / 1e7:.2f}"],
             ["Less: Operating Expense", f"-{financials['opex_inr'] / 1e7:.2f}"],
             ["Operational Cash Profit (EBITDA)", f"{financials['ebitda_inr'] / 1e7:.2f}"],
@@ -273,11 +277,11 @@ def _render_pdf(
         ))
 
         doc.build(body)
-        return True
+        return True, None
     except Exception as e:
         print(f"PDF Render Error: {e}")
-        filepath.write_text(f"PDF Generation Failed: {e}")
-        return False
+        # Never write plain text into a .pdf file; return error to caller instead.
+        return False, str(e)
 
 
 # ── endpoints ─────────────────────────────────────────────────────────────────
@@ -324,20 +328,40 @@ def _detect_anomalies(df: pd.DataFrame) -> list:
     return anomalies
 
 
-def _compute_financials(df: pd.DataFrame, model_results: list, anomalies: list) -> dict:
+def _get_business_df(start_ts: str, end_ts: str, entity: str = "IND") -> pd.DataFrame:
+    start_date = pd.to_datetime(start_ts).strftime("%Y-%m-%d")
+    end_date = pd.to_datetime(end_ts).strftime("%Y-%m-%d")
+    try:
+        return asyncio.run(ember_client.fetch_hourly_prices(start_date, end_date, entity))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(ember_client.fetch_hourly_prices(start_date, end_date, entity))
+        finally:
+            loop.close()
+    except Exception:
+        return pd.DataFrame()
+
+
+def _compute_financials(df: pd.DataFrame, model_results: list, anomalies: list, business_df: pd.DataFrame) -> dict:
     if df.empty:
         total_mwh = 0.0
     else:
         total_mwh = float(pd.to_numeric(df["actual"], errors="coerce").fillna(0).sum())
-    net_energy_billed_mwh = total_mwh * (1 - DISTRIBUTION_LOSS_FACTOR)
 
-    gross_revenue_inr = total_mwh * 1000 * REALIZED_TARIFF
+    net_energy_billed_mwh = total_mwh * (1 - DISTRIBUTION_LOSS_FACTOR)
+    avg_price_mwh = 0.0
+    if not business_df.empty and "price_mwh" in business_df.columns:
+        avg_price_mwh = float(pd.to_numeric(business_df["price_mwh"], errors="coerce").dropna().mean())
+
+    # Business-driven revenue from Ember market pricing
+    realized_tariff_observed = (avg_price_mwh / 1000.0) if avg_price_mwh > 0 else REALIZED_TARIFF
+    gross_revenue_inr = total_mwh * max(avg_price_mwh, REALIZED_TARIFF * 1000)
     opex_inr = total_mwh * 1000 * OPEX_PER_UNIT
     ebitda_inr = gross_revenue_inr - opex_inr
     carbon_credit_inr = net_energy_billed_mwh * 1000 * CARBON_CREDIT_RATE
     co2_avoided_tonnes = net_energy_billed_mwh * 0.8
 
-    realized_tariff_observed = gross_revenue_inr / max(net_energy_billed_mwh * 1000, 1e-9)
     tariff_drift_pct = ((realized_tariff_observed - REALIZED_TARIFF) / REALIZED_TARIFF) * 100
     tariff_status = "DRIFTING" if abs(tariff_drift_pct) > 5 else "STABLE"
 
@@ -351,7 +375,6 @@ def _compute_financials(df: pd.DataFrame, model_results: list, anomalies: list) 
     dso_days = DSO_BENCHMARK_DAYS + max(0.0, (avg_mape - 5.0) * 1.5) + min(6.0, len(anomalies) * 0.15)
     financial_health_status = "HEALTHY" if dso_days <= DSO_BENCHMARK_DAYS else ("WATCH" if dso_days <= 30 else "STRESSED")
 
-    # Proxy leverage estimate for reporting layer alignment
     debt_to_ebitda = 2.0 if ebitda_inr > 0 else 3.5
     if ebitda_inr <= 0.8 * gross_revenue_inr:
         debt_to_ebitda += 0.3
@@ -463,8 +486,17 @@ def generate_report(start: str = None, end: str = None):
         })
 
     anomalies = _detect_anomalies(df)
-    financials = _compute_financials(df, model_results, anomalies)
-    _render_pdf(title, subtitle, model_results, anomalies, financials, filepath)
+    if not df.empty and "timestamp" in df.columns:
+        start_ts = str(pd.to_datetime(df["timestamp"].min()))
+        end_ts = str(pd.to_datetime(df["timestamp"].max()))
+    else:
+        start_ts = now.strftime("%Y-%m-%d 00:00:00")
+        end_ts = now.strftime("%Y-%m-%d 23:59:59")
+    business_df = _get_business_df(start_ts, end_ts)
+    financials = _compute_financials(df, model_results, anomalies, business_df)
+    ok, error = _render_pdf(title, subtitle, model_results, anomalies, financials, filepath)
+    if not ok:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {error}")
     
     return {
         "status": "generated", 

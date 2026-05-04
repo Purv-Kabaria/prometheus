@@ -365,8 +365,8 @@ export default function ReportingPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "40px" }}>
         <Card title="Net Energy Billed" value={`${billedMWh.toFixed(1)} MWh`} subtext={`Loss-adjusted using ${(DISTRIBUTION_LOSS_FACTOR * 100).toFixed(2)}% factor`} accentColor="var(--primary)" />
-        <Card title="Operational Profit (EBITDA)" value={`₹${(ebitdaINR / 1e7).toFixed(2)} Cr`} subtext={`Opex baseline ₹${OPEX_PER_UNIT.toFixed(2)}/kWh`} accentColor="var(--success)" />
-        <Card title="Carbon Credit Potential" value={`₹${(carbonCreditINR / 1e7).toFixed(2)} Cr`} subtext={`Rate ₹${CARBON_CREDIT_RATE.toFixed(2)}/kWh renewable mix`} accentColor="var(--warning)" />
+        <Card title="Operational Profit (EBITDA)" value={`₹${(ebitdaINR / 1e7).toFixed(2)} Cr`} subtext={`Opex baseline \$${OPEX_PER_UNIT.toFixed(2)}/kWh`} accentColor="var(--success)" />
+        <Card title="Carbon Credit Potential" value={`₹${(carbonCreditINR / 1e7).toFixed(2)} Cr`} subtext={`Rate \$${CARBON_CREDIT_RATE.toFixed(2)}/kWh renewable mix`} accentColor="var(--warning)" />
       </div>
 
       {/* Reports Archive */}
