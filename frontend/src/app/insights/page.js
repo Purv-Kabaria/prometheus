@@ -4,14 +4,26 @@ import Card from "@/components/Card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function InsightsPage() {
-  const shapData = [
-    { feature: "lag_1", contribution: 45 },
-    { feature: "lag_24", contribution: 25 },
-    { feature: "lag_168", contribution: 15 },
-    { feature: "temperature", contribution: 8 },
-    { feature: "is_weekend", contribution: 5 },
-    { feature: "hour_sin", contribution: 2 },
+  // Derived from notebook SHAP waterfall output (forecasting_models.ipynb, viz_30)
+  // Values are absolute SHAP magnitudes converted to percentage share.
+  const shapRawImpacts = [
+    { feature: "lag_1", impact: -908.01 },
+    { feature: "hour_sin", impact: -61.29 },
+    { feature: "hour_cos", impact: 35.46 },
+    { feature: "month_cos", impact: 32.23 },
+    { feature: "rolling_mean_24", impact: -23.04 },
+    { feature: "lag_168", impact: -16.52 },
+    { feature: "lag_24", impact: -15.70 },
+    { feature: "month_sin", impact: -12.92 },
+    { feature: "ema_12", impact: -12.58 },
+    { feature: "other_features", impact: 12.58 },
   ];
+
+  const totalAbsImpact = shapRawImpacts.reduce((sum, row) => sum + Math.abs(row.impact), 0);
+  const shapData = shapRawImpacts.map((row) => ({
+    feature: row.feature,
+    contribution: Number(((Math.abs(row.impact) / totalAbsImpact) * 100).toFixed(2)),
+  }));
 
   return (
     <div style={{ paddingBottom: "80px" }}>
@@ -31,7 +43,9 @@ export default function InsightsPage() {
         <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "32px" }}>
           <div style={{ marginBottom: "32px" }}>
             <h3 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Feature Impact (SHAP)</h3>
-            <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "4px" }}>Weighted contribution to the latest 24h demand forecast.</p>
+            <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "4px" }}>
+              Contribution share from notebook SHAP output (cell 33 / viz_29-viz_30), normalized by absolute SHAP magnitude.
+            </p>
           </div>
           
           <div style={{ height: 320 }}>
@@ -77,4 +91,3 @@ export default function InsightsPage() {
     </div>
   );
 }
-

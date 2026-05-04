@@ -1,11 +1,24 @@
+[14:43:31] (+  0.0s) 🚀 Prometheus retrain started  job=1575b3fe-ca97-4e39-abc1-4f3798a1aa82
+[14:43:31] (+  0.0s)    new=v2  parent=v1
+[14:43:31] (+  0.0s)    epochs=2  batch=32  lr=5e-05  xgb_trees=30
+[14:43:31] (+  0.0s)    freeze_backbone=True
+
+──────────────────────────────────────────────────
+  STEP 1/7 · Loading parent artefacts
+──────────────────────────────────────────────────
+[14:43:31] (+  0.0s) [LOAD] Parent dir : D:\Aayush\Projects\powermind_adani_hackthon\backend\models\final_submission
+[14:43:31] (+  0.0s) ❌ Retrain FAILED:
 Traceback (most recent call last):
-  File "D:\Projects\Prometheus\backend\scripts\retrain.py", line 438, in <module>
-    log(f"\U0001f680 Prometheus retrain started  job={args.job_id}")
-    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "D:\Projects\Prometheus\backend\scripts\retrain.py", line 59, in log
-    print(f"[{ts}] (+{elapsed:5.1f}s) {tag}{msg}", flush=True)
-    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Python313\Lib\encodings\cp1252.py", line 19, in encode
-    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f680' in position 21: character maps to <undefined>
+  File "D:\Aayush\Projects\powermind_adani_hackthon\backend\scripts\retrain.py", line 444, in <module>
+    retrain(
+    ~~~~~~~^
+        job_id          = args.job_id,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+        xgb_trees       = args.xgb_trees,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Aayush\Projects\powermind_adani_hackthon\backend\scripts\retrain.py", line 203, in retrain
+    scaler_X = pickle.load(f)
+_pickle.UnpicklingError: STACK_GLOBAL requires str

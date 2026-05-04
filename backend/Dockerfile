@@ -2,8 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Upgrade pip first to clear any stale/corrupt package hash cache
+RUN pip install --upgrade pip
+
 # Layer 1: Core data science & API packages (always required, always installed)
-RUN pip install --default-timeout=100 --no-cache-dir \
+RUN pip install --default-timeout=100 --no-cache-dir --retries 3 \
     numpy pandas scipy scikit-learn \
     lightgbm xgboost \
     statsmodels pmdarima \

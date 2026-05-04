@@ -148,8 +148,8 @@ function ModelSelector({ models, activeModel, onChange, loading }) {
 
 // ─── 24h Forecast Panel ───────────────────────────────────────────────────────
 function Forecast24h({ data, models }) {
-  if (!data) return <Spinner />;
-  const { slots, summary, model } = data;
+  if (!data || !data.slots) return <Spinner />;
+  const { slots = [], summary = {}, model } = data;
   const isAll = model === "all";
 
   const chartData = slots.map(s => {
@@ -173,6 +173,11 @@ function Forecast24h({ data, models }) {
         sub={isAll ? "Overlay of all deployed operational models" : "Hourly P10 / P50 / P90 quantile bands"}
         tag={`Avg confidence ${data.summary?.avg_confidence}%`}
       />
+      {data.fallback && (
+        <div style={{ background: "rgba(230, 126, 34, 0.08)", border: "1px solid var(--warning)", borderRadius: "8px", padding: "12px 16px", color: "var(--warning)", fontSize: "13px", marginBottom: "32px", fontWeight: "600" }}>
+          ⚠️ Performance Warning: Selected model prediction failed. Showing synthetic fallback. (Reason: {data.error})
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "20px", marginBottom: "48px" }}>
         <Card title="Peak Demand" value={fmtMW(summary.peak_mw)} subtext={`at ${summary.peak_hour}`} accentColor="var(--warning)" />
         <Card title="Trough Demand" value={fmtMW(summary.trough_mw)} subtext={`at ${summary.trough_hour}`} accentColor="var(--primary)" />
@@ -254,8 +259,9 @@ function Forecast24h({ data, models }) {
 
 // ─── 7-Day Forecast Panel ─────────────────────────────────────────────────────
 function Forecast7Day({ data }) {
-  if (!data) return <Spinner />;
-  const { days, summary } = data;
+  if (!data || !data.days) return <Spinner />;
+  const days = data.days || [];
+  const summary = data.summary || {};
   const chartData = days.map(d => ({ label: d.day_name, peak: d.peak_mw, mean: d.mean_mw, trough: d.trough_mw }));
 
   return (
@@ -263,12 +269,17 @@ function Forecast7Day({ data }) {
       <SectionHeader
         title="7-Day Strategic Outlook"
         sub="Long-term demand trends and unit commitment planning"
-        tag={`Maint. window: ${summary.best_maintenance_day}`}
+        tag={summary.best_maintenance_day ? `Maint. window: ${summary.best_maintenance_day}` : "Maintenance Window"}
       />
+      {data.fallback && (
+        <div style={{ background: "rgba(230, 126, 34, 0.08)", border: "1px solid var(--warning)", borderRadius: "8px", padding: "12px 16px", color: "var(--warning)", fontSize: "13px", marginBottom: "32px", fontWeight: "600" }}>
+          ⚠️ Performance Warning: Selected model prediction failed. Showing synthetic fallback. (Reason: {data.error})
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "20px", marginBottom: "48px" }}>
-        <Card title="Best Maintenance" value={summary.best_maintenance_day} subtext={summary.best_maintenance_date} accentColor="var(--primary)" />
-        <Card title="Peak Commitment" value={`${summary.max_units_needed}`} subtext="Units required" accentColor="var(--warning)" />
-        <Card title="Critical Window" value={`${summary.procurement_days.length} days`} subtext="High-procurement period" accentColor="var(--danger)" />
+        <Card title="Best Maintenance" value={summary.best_maintenance_day || "N/A"} subtext={summary.best_maintenance_date || "N/A"} accentColor="var(--primary)" />
+        <Card title="Peak Commitment" value={`${summary.max_units_needed || 0}`} subtext="Units required" accentColor="var(--warning)" />
+        <Card title="Critical Window" value={`${summary.procurement_days ? summary.procurement_days.length : 0} days`} subtext="High-procurement period" accentColor="var(--danger)" />
       </div>
       <div style={{ height: 320, marginBottom: "48px" }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -290,7 +301,7 @@ function Forecast7Day({ data }) {
             borderRadius: "12px", padding: "20px 12px", textAlign: "center", transition: "all 0.2s"
           }}>
             <div style={{ fontWeight: "700", fontSize: "14px", marginBottom: "4px" }}>{d.day_name}</div>
-            <div style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "12px", textTransform: "uppercase" }}>{d.date.split('-').slice(1).join('/')}</div>
+            <div style={{ fontSize: "10px", color: "var(--muted)", marginBottom: "12px", textTransform: "uppercase" }}>{d.date ? d.date.split('-').slice(1).join('/') : ""}</div>
             <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "12px" }}>{fmtMW(d.peak_mw)}</div>
             {d.maintenance_ok && <Badge label="OK" color="success" />}
           </div>
@@ -300,11 +311,85 @@ function Forecast7Day({ data }) {
   );
 }
 
+// ─── 30-Day Forecast Panel ───────────────────────────────────────────────────
+function Forecast30Day({ data }) {
+  if (!data || !data.days) return <Spinner />;
+  const days = data.days || [];
+  const summary = data.summary || {};
+  const chartData = days.map(d => ({ label: d.day_name, date: d.date, peak: d.peak_mw, mean: d.mean_mw, trough: d.trough_mw }));
+
+  return (
+    <>
+      <SectionHeader
+        title="30-Day Outlook"
+        sub="Long-term demand trends and strategic unit planning"
+        tag={summary.best_maintenance_day ? `Maint. window: ${summary.best_maintenance_day}` : "Maintenance Window"}
+      />
+      {data.fallback && (
+        <div style={{ background: "rgba(230, 126, 34, 0.08)", border: "1px solid var(--warning)", borderRadius: "8px", padding: "12px 16px", color: "var(--warning)", fontSize: "13px", marginBottom: "32px", fontWeight: "600" }}>
+          ⚠️ Performance Warning: Selected model prediction failed. Showing synthetic fallback. (Reason: {data.error})
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "20px", marginBottom: "48px" }}>
+        <Card title="Best Maintenance" value={summary.best_maintenance_day || "N/A"} subtext={summary.best_maintenance_date || "N/A"} accentColor="var(--primary)" />
+        <Card title="Peak Commitment" value={`${summary.max_units_needed || 0}`} subtext="Units required" accentColor="var(--warning)" />
+        <Card title="Critical Window" value={`${summary.procurement_days ? summary.procurement_days.length : 0} days`} subtext="High-procurement period" accentColor="var(--danger)" />
+      </div>
+      <div style={{ height: 320, marginBottom: "48px" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--surface-border)" />
+            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 9 }} interval={4} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} tickFormatter={fmt} />
+            <Tooltip content={<ChartTooltip />} />
+            <Bar dataKey="peak" name="Peak Demand" fill="var(--primary)" radius={[4,4,0,0]} barSize={20} />
+            <Bar dataKey="mean" name="Mean Demand" fill="var(--primary)" opacity={0.15} radius={[4,4,0,0]} barSize={20} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ overflowX: "auto", maxHeight: "400px", border: "1px solid var(--surface-border)", borderRadius: "12px", background: "var(--surface)" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--surface-border)", background: "var(--accent)" }}>
+              {["Date", "Day", "Peak", "Mean", "Trough", "Maint. Score", "Status"].map(h => (
+                <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: "var(--muted)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {days.map(d => (
+              <tr key={d.date} style={{ borderBottom: "1px solid var(--surface-border)", background: d.maintenance_ok ? "rgba(39, 174, 96, 0.05)" : "transparent" }}>
+                <td style={{ padding: "12px 16px", fontWeight: "600", color: "var(--foreground)" }}>{d.date}</td>
+                <td style={{ padding: "12px 16px" }}>{d.day_name}</td>
+                <td style={{ padding: "12px 16px", fontWeight: "700" }}>{fmtMW(d.peak_mw)}</td>
+                <td style={{ padding: "12px 16px", color: "var(--muted)" }}>{fmtMW(d.mean_mw)}</td>
+                <td style={{ padding: "12px 16px", color: "var(--muted)" }}>{fmtMW(d.trough_mw)}</td>
+                <td style={{ padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ width: "60px", height: "4px", background: "var(--surface-border)", borderRadius: "2px", overflow: "hidden" }}>
+                      <div style={{ width: `${(d.maintenance_score || 0) * 100}%`, height: "100%", background: d.maintenance_ok ? "var(--success)" : "var(--warning)", opacity: 0.8 }} />
+                    </div>
+                    <span style={{ color: "var(--muted)", fontSize: "10px" }}>{((d.maintenance_score || 0) * 100).toFixed(0)}%</span>
+                  </div>
+                </td>
+                <td style={{ padding: "12px 16px" }}>
+                  {d.procurement_flag && <Badge label="High Demand" color="critical" />}
+                  {d.maintenance_ok && <Badge label="Maint OK" color="success" />}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 // ─── Peak Hours Panel ─────────────────────────────────────────────────────────
 function PeakHours({ data }) {
-  if (!data) return <Spinner />;
-  const { days } = data;
-  const today = days[0];
+  if (!data || !data.days || data.days.length === 0) return <Spinner />;
+  const { days = [] } = data;
+  const today = days[0] || { peaks: [] };
   const COLORS = { critical: "var(--danger)", high: "var(--warning)", elevated: "#ca8a04" };
 
   return (
@@ -313,8 +398,13 @@ function PeakHours({ data }) {
         title="Predictive Peak Spikes"
         sub="Forecasted grid stress points and reserve requirements"
       />
+      {data.fallback && (
+        <div style={{ background: "rgba(230, 126, 34, 0.08)", border: "1px solid var(--warning)", borderRadius: "8px", padding: "12px 16px", color: "var(--warning)", fontSize: "13px", marginBottom: "32px", fontWeight: "600" }}>
+          ⚠️ Performance Warning: Selected model prediction failed. Showing synthetic fallback. (Reason: {data.error})
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "24px", marginBottom: "48px" }}>
-        {today.peaks.map(p => (
+        {(today.peaks || []).map(p => (
           <div key={p.rank} style={{
             border: "1px solid var(--surface-border)",
             borderRadius: "var(--radius)", padding: "28px",
@@ -362,8 +452,8 @@ function PeakHours({ data }) {
 
 // ─── Off-Peak Windows Panel ────────────────────────────────────────────────────
 function OffPeak({ data }) {
-  if (!data) return <Spinner />;
-  const { windows, summary, daily_peak_mw, offpeak_threshold_mw } = data;
+  if (!data || !data.windows) return <Spinner />;
+  const { windows = [], summary = {}, daily_peak_mw, offpeak_threshold_mw } = data;
 
   return (
     <>
@@ -371,10 +461,15 @@ function OffPeak({ data }) {
         title="Operational Off-Peak Windows"
         sub="Dispatch windows optimized for storage and non-critical maintenance"
       />
+      {data.fallback && (
+        <div style={{ background: "rgba(230, 126, 34, 0.08)", border: "1px solid var(--warning)", borderRadius: "8px", padding: "12px 16px", color: "var(--warning)", fontSize: "13px", marginBottom: "32px", fontWeight: "600" }}>
+          ⚠️ Performance Warning: Selected model prediction failed. Showing synthetic fallback. (Reason: {data.error})
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "20px", marginBottom: "48px" }}>
-        <Card title="Available Slots" value={`${summary.total_windows}`} subtext={`${summary.total_offpeak_hours}h combined`} accentColor="var(--success)" />
-        <Card title="Max Window" value={`${summary.longest_window_h}h`} subtext="Continuous duration" accentColor="var(--primary)" />
-        <Card title="Saving Capacity" value={fmtMW(summary.est_saving_mw)} subtext="Est. MW-h potential" accentColor="var(--success)" />
+        <Card title="Available Slots" value={`${summary.total_windows || 0}`} subtext={`${summary.total_offpeak_hours || 0}h combined`} accentColor="var(--success)" />
+        <Card title="Max Window" value={`${summary.longest_window_h || 0}h`} subtext="Continuous duration" accentColor="var(--primary)" />
+        <Card title="Saving Capacity" value={fmtMW(summary.est_saving_mw || 0)} subtext="Est. MW-h potential" accentColor="var(--success)" />
       </div>
 
       {windows.length === 0 ? (
@@ -603,6 +698,7 @@ export default function ForecastingPage() {
   const [models, setModels] = useState([]);
   const [data24h, setData24h]   = useState(null);
   const [data7d,  setData7d]    = useState(null);
+  const [data30d, setData30d]   = useState(null);
   const [dataPeak, setDataPeak] = useState(null);
   const [dataOff,  setDataOff]  = useState(null);
   const [loading, setLoading]   = useState(false);
@@ -622,14 +718,16 @@ export default function ForecastingPage() {
     setError(null);
     try {
       const qs = `model=${m}`;
-      const [r24h, r7d, rPeak, rOff] = await Promise.all([
+      const [r24h, r7d, r30d, rPeak, rOff] = await Promise.all([
         fetch(`${API}/24h?${qs}`).then(r => r.json()),
         fetch(`${API}/7day?${qs}`).then(r => r.json()),
+        fetch(`${API}/30day?${qs}`).then(r => r.json()),
         fetch(`${API}/peak-hours?days=7&${qs}`).then(r => r.json()),
         fetch(`${API}/offpeak?${qs}`).then(r => r.json()),
       ]);
       setData24h(r24h);
       setData7d(r7d);
+      setData30d(r30d);
       setDataPeak(rPeak);
       setDataOff(rOff);
       setLastUpdated(new Date().toLocaleTimeString());
@@ -643,13 +741,14 @@ export default function ForecastingPage() {
 
   const handleModelChange = (key) => {
     setActiveModel(key);
-    setData24h(null); setData7d(null); setDataPeak(null); setDataOff(null);
+    setData24h(null); setData7d(null); setData30d(null); setDataPeak(null); setDataOff(null);
     refresh(key);
   };
 
   const TABS = [
     { id: "24h",    label: "24h Forecast" },
     { id: "7day",   label: "7-Day Outlook" },
+    { id: "30day",  label: "30-Day Outlook" },
     { id: "peak",   label: "Peak Spikes" },
     { id: "offpeak",label: "Off-Peak Windows" },
     { id: "explain",label: "Explainability (XAI)" },
@@ -714,6 +813,7 @@ export default function ForecastingPage() {
       <Panel>
         {tab === "24h"     && <Forecast24h data={data24h} models={models} />}
         {tab === "7day"    && <Forecast7Day data={data7d} models={models} />}
+        {tab === "30day"   && <Forecast30Day data={data30d} models={models} />}
         {tab === "peak"    && <PeakHours data={dataPeak} />}
         {tab === "offpeak" && <OffPeak data={dataOff} />}
         {tab === "explain" && <XAIExplainPanel activeModel={activeModel} />}

@@ -39,7 +39,7 @@ logging.getLogger("uvicorn.access").addFilter(_SuppressStatusPoll())
 
 app = FastAPI(
     title="Prometheus Grid API",
-    description="ML Pipeline & Operational Intelligence for Maharashtra Grid Officers",
+    description="ML Pipeline & Operational Intelligence for Grid Operators",
     version="2.1.0",
 )
 
@@ -72,9 +72,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ── Include All Routers ──────────────────────────────────────────────────────
 if agent_router is not None:
     app.include_router(agent_router)
+# Triggering reload again
 app.include_router(forecast_router)
 app.include_router(anomalies_router)
 app.include_router(pipeline_router.router)

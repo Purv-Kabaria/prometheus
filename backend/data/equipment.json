@@ -1,0 +1,65 @@
+[
+  {
+    "id": "GEN-01",
+    "type": "Coal Power Plant",
+    "capacity_mw": 1200,
+    "maintenance_interval_days": 90,
+    "last_maintained": "2026-02-01",
+    "location": "Unit 1, Mundra Thermal, Gujarat",
+    "criticality": "high"
+  },
+  {
+    "id": "GEN-02",
+    "type": "Solar Farm",
+    "capacity_mw": 800,
+    "maintenance_interval_days": 180,
+    "last_maintained": "2026-04-01",
+    "location": "Rajkot Solar Park, Gujarat",
+    "criticality": "medium"
+  },
+  {
+    "id": "GEN-03",
+    "type": "Wind Farm",
+    "capacity_mw": 450,
+    "maintenance_interval_days": 60,
+    "last_maintained": "2026-03-20",
+    "location": "Kutch Wind Zone, Gujarat",
+    "criticality": "medium"
+  },
+  {
+    "id": "TRF-A1",
+    "type": "Main Substation Transformer",
+    "capacity_mw": 2000,
+    "maintenance_interval_days": 365,
+    "last_maintained": "2025-12-01",
+    "location": "Ahmedabad Substation, 400kV Bay",
+    "criticality": "critical"
+  },
+  {
+    "id": "BATT-01",
+    "type": "Grid Battery Storage",
+    "capacity_mw": 150,
+    "maintenance_interval_days": 120,
+    "last_maintained": "2026-01-15",
+    "location": "Gandhinagar BESS Facility",
+    "criticality": "medium"
+  },
+  {
+    "id": "GEN-04",
+    "type": "Gas Peaker Plant",
+    "capacity_mw": 600,
+    "maintenance_interval_days": 120,
+    "last_maintained": "2026-03-10",
+    "location": "Pipavav Combined Cycle, Gujarat",
+    "criticality": "high"
+  },
+  {
+    "id": "TRF-B2",
+    "type": "Distribution Transformer",
+    "capacity_mw": 500,
+    "maintenance_interval_days": 180,
+    "last_maintained": "2026-01-20",
+    "location": "Surat Grid Node, 220kV",
+    "criticality": "medium"
+  }
+]

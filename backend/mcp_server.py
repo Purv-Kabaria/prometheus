@@ -3,6 +3,7 @@ import json
 import random
 import sys
 import os
+from datetime import datetime
 
 # Ensure we can import from local directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -11,6 +12,21 @@ from database import add_proposal
 # Initialize the FastMCP server for the Grid Agent
 mcp = FastMCP("PrometheusGridAgent")
 
+# ── Equipment registry ────────────────────────────────────────────────────────
+_EQUIPMENT_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "equipment.json")
+
+def _load_equipment() -> list:
+    """Load the configurable equipment list from data/equipment.json."""
+    try:
+        with open(_EQUIPMENT_JSON, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[MCP] Could not load equipment.json: {e}. Using minimal fallback.")
+        return [
+            {"id": "GEN-01", "type": "Coal Power Plant", "capacity_mw": 1200,
+             "maintenance_interval_days": 90, "last_maintained": "2026-02-01"},
+        ]
+
 from routers.forecast import forecast_24h
 
 @mcp.tool()
@@ -18,7 +34,7 @@ def get_demand_forecast(hours: int = 24) -> str:
     """Get the hourly demand forecast for the specified number of hours."""
     try:
         # Fetch real predictions from the TCN_XGB/Mamba model router
-        forecast_data = forecast_24h(state="Maharashtra", model="tcn_xgb")
+        forecast_data = forecast_24h(model="tcn_xgb")
         slots = forecast_data.get("slots", [])[:hours]
         p50_forecasts = [slot["p50"] for slot in slots]
         
@@ -35,53 +51,92 @@ def get_demand_forecast(hours: int = 24) -> str:
 
 @mcp.tool()
 def get_committed_generation() -> str:
-    """Get the currently committed power generation for the grid in real-time."""
+    """
+    Get the current committed power generation broken down by source type.
+    Solar output uses real solar physics (sine curve peaking at noon).
+    Total demand is derived from the real TCN+XGB forecast.
+    """
     try:
+        import math as _math
         from datetime import datetime
-        # Fetch the day's forecast to determine the necessary baseload
-        forecast_data = forecast_24h(state="Maharashtra", model="tcn_xgb")
-        peak_mw = forecast_data.get("summary", {}).get("peak_mw", 4500)
-        
-        # Grid operators commit generation to cover peak demand + ~10% spinning reserve
-        base_commitment = peak_mw * 1.10
-        
-        # Add a real-time micro-fluctuation to simulate live physical plant output (± 50 MW)
-        current_minute = datetime.now().minute
-        fluctuation = (current_minute % 10) * 10 - 50 
-        
-        real_time_generation = round(base_commitment + fluctuation, 1)
-        
+        now = datetime.now()
+        hour = now.hour
+        minute = now.minute
+
+        # Get current-hour demand from the real forecast model
+        forecast_data = forecast_24h(model="tcn_xgb")
+        slots = forecast_data.get("slots", [])
+        current_demand = slots[0].get("p50", 13800) if slots else 13800
+        peak_mw = forecast_data.get("summary", {}).get("peak_mw", 15000)
+
+        # ── Coal baseload: stable, slightly fluctuates with minute ─────────
+        coal_output = round(6000 * 0.85 + (minute % 15) * 2)
+
+        # ── Solar: physically real — zero at night, sine peak at noon ──────
+        solar_capacity = 2500  # MW (representative installed capacity)
+        if 6 <= hour <= 18:
+            solar_fraction = max(0.0, _math.sin(_math.pi * (hour - 6) / 12))
+            cloud_factor = 0.80 + (minute % 20) / 100   # ±20% cloud variation
+            solar_output = round(solar_capacity * solar_fraction * cloud_factor)
+        else:
+            solar_output = 0
+
+        # ── Wind: higher at night, stochastic but deterministic for demo ───
+        wind_capacity = 2000
+        wind_base = 0.40 if (hour < 6 or hour > 20) else 0.28
+        wind_jitter = ((hour * 7 + minute * 3) % 20 - 10) / 100
+        wind_output = round(wind_capacity * max(0.10, min(0.85, wind_base + wind_jitter)))
+
+        # ── Hydro: dispatchable, follows demand curve ───────────────────────
+        hydro_output = round(2000 * (0.60 if 8 <= hour <= 22 else 0.35))
+
+        # ── Gas peakers: fill the gap to meet demand + 8% spinning reserve ─
+        renewables = coal_output + solar_output + wind_output + hydro_output
+        target = round(current_demand * 1.08)   # 8% spinning reserve
+        gas_output = max(0, min(3500, target - renewables))
+
+        total = coal_output + solar_output + wind_output + hydro_output + gas_output
+        headroom = round(total - current_demand)
+        reserve_pct = round(headroom / current_demand * 100, 1) if current_demand else 0.0
+
+        alert = (
+            "over_generation" if headroom > current_demand * 0.15 else
+            "supply_risk"     if headroom < 0 else
+            "normal"
+        )
+
         return json.dumps({
-            "status": "success", 
-            "generation_mwh": real_time_generation, 
-            "unit": "MW",
-            "reserve_margin_pct": 10.0,
-            "timestamp": datetime.now().strftime("%H:%M:%S")
+            "status": "success",
+            "timestamp": now.strftime("%H:%M:%S"),
+            "total_generation_mw": total,
+            "forecast_demand_mw": current_demand,
+            "headroom_mw": headroom,
+            "reserve_margin_pct": reserve_pct,
+            "grid_alert": alert,
+            "generation_mix": {
+                "coal_baseload_mw": coal_output,
+                "solar_mw":        solar_output,
+                "wind_mw":         wind_output,
+                "hydro_mw":        hydro_output,
+                "gas_peaker_mw":   gas_output
+            },
+            "note": "Solar uses real physics (sine curve). Demand from real TCN+XGB forecast. Other sources are simulated."
         })
     except Exception as e:
-        return json.dumps({"status": "fallback", "generation_mwh": 5000, "unit": "MW", "error": str(e)})
+        return json.dumps({"status": "fallback", "total_generation_mw": 15000, "unit": "MW", "error": str(e)})
 
 @mcp.tool()
 def get_grid_equipment() -> str:
-    """Get all active grid equipment with maintenance status and overdue flags."""
-    from datetime import datetime
-
+    """Get all active grid equipment with maintenance status and overdue flags. Loads from data/equipment.json."""
     today = datetime.now().date()
-    equipment = [
-        {"id": "GEN-01", "type": "Coal Power Plant",           "capacity_mw": 1200, "maintenance_interval_days": 90,  "last_maintained": "2026-02-01"},
-        {"id": "GEN-02", "type": "Solar Farm",                 "capacity_mw": 800,  "maintenance_interval_days": 180, "last_maintained": "2026-04-01"},
-        {"id": "GEN-03", "type": "Wind Farm",                  "capacity_mw": 450,  "maintenance_interval_days": 60,  "last_maintained": "2026-03-20"},
-        {"id": "TRF-A1", "type": "Main Substation Transformer","capacity_mw": 2000, "maintenance_interval_days": 365, "last_maintained": "2025-12-01"},
-        {"id": "BATT-01","type": "Grid Battery Storage",       "capacity_mw": 150,  "maintenance_interval_days": 120, "last_maintained": "2026-01-15"},
-    ]
+    equipment = _load_equipment()
     for eq in equipment:
-        from datetime import datetime as dt
-        last = dt.strptime(eq["last_maintained"], "%Y-%m-%d").date()
+        last = datetime.strptime(eq["last_maintained"], "%Y-%m-%d").date()
         days_since = (today - last).days
         eq["days_since_last_maintenance"] = days_since
         eq["overdue"] = days_since > eq["maintenance_interval_days"]
         eq["status"] = "needs_maintenance" if eq["overdue"] else "active"
-    return json.dumps({"status": "success", "equipment": equipment})
+    return json.dumps({"status": "success", "equipment": equipment, "source": "data/equipment.json"})
 
 @mcp.tool()
 def find_optimal_maintenance_window(equipment_id: str, duration_hours: int = 4) -> str:
@@ -93,12 +148,10 @@ def find_optimal_maintenance_window(equipment_id: str, duration_hours: int = 4) 
     try:
         from datetime import datetime, timedelta
 
+        # Build registry dynamically from the same JSON source
         EQUIPMENT_REGISTRY = {
-            "GEN-01": {"capacity_mw": 1200, "type": "Coal Power Plant"},
-            "GEN-02": {"capacity_mw": 800,  "type": "Solar Farm"},
-            "GEN-03": {"capacity_mw": 450,  "type": "Wind Farm"},
-            "TRF-A1": {"capacity_mw": 2000, "type": "Main Substation Transformer"},
-            "BATT-01": {"capacity_mw": 150,  "type": "Grid Battery Storage"},
+            eq["id"]: {"capacity_mw": eq["capacity_mw"], "type": eq["type"]}
+            for eq in _load_equipment()
         }
 
         if equipment_id not in EQUIPMENT_REGISTRY:
@@ -110,7 +163,7 @@ def find_optimal_maintenance_window(equipment_id: str, duration_hours: int = 4) 
         remaining_capacity = total_capacity - eq["capacity_mw"]
 
         # Use real forecast to evaluate every possible window
-        forecast_data = forecast_24h(state="Maharashtra", model="tcn_xgb")
+        forecast_data = forecast_24h(model="tcn_xgb")
         slots = forecast_data.get("slots", [])
 
         base_time = datetime.now().replace(minute=0, second=0, microsecond=0)

@@ -13,7 +13,7 @@
     "equipment_id": "ID123",
     "start_time": "now",
     "end_time": "now",
-    "status": "pending_approval"
+    "status": "rejected"
   },
   {
     "id": "maint_5399",
@@ -21,7 +21,7 @@
     "equipment_id": "gen-01",
     "start_time": "23:00",
     "end_time": "03:00",
-    "status": "pending_approval"
+    "status": "rejected"
   },
   {
     "id": "maint_2972",
@@ -29,7 +29,7 @@
     "equipment_id": "[Provide specific Equipment ID]",
     "start_time": "12",
     "end_time": "13",
-    "status": "pending_approval"
+    "status": "rejected"
   },
   {
     "id": "maint_2004",
@@ -37,6 +37,35 @@
     "equipment_id": "E001",
     "start_time": "13:00",
     "end_time": "14:00",
+    "status": "accepted"
+  },
+  {
+    "id": "maint_6888",
+    "action_type": "maintenance",
+    "equipment_id": "GEN-01",
+    "start_time": "2023-11-09T22:00:00Z",
+    "end_time": "2023-11-10T05:00:00Z",
+    "rationale": "Maintenance scheduled for GEN-01 during a forecast low-demand window (2023-11-09T22:00:00Z \u2013 2023-11-10T05:00:00Z) to minimize grid disruption.",
+    "status": "overridden",
+    "officer_reason": "I think you need to rethink about the maintainance window you proposed, rethink and then tell me once again"
+  },
+  {
+    "id": "prop_1382",
+    "action_type": "curtail",
+    "target_mwh": -1341.0,
+    "target_hour": "19:30",
+    "rationale": "To compensate for the current shortage and ensure stable operation.",
+    "status": "overridden",
+    "officer_reason": "rethink about your estimation and decision about curtailing and give me your final decision\n",
+    "overridden_mwh": -1341.0
+  },
+  {
+    "id": "maint_4869",
+    "action_type": "maintenance",
+    "equipment_id": "GEN-01",
+    "start_time": "2054-09-06T08:30:00Z",
+    "end_time": "2054-09-06T20:30:00Z",
+    "rationale": "Maintenance scheduled for GEN-01 during a forecast low-demand window (2054-09-06T08:30:00Z \u2013 2054-09-06T20:30:00Z) to minimize grid disruption.",
     "status": "pending_approval"
   }
 ]
