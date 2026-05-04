@@ -818,12 +818,6 @@ export default function ForecastingPage() {
         {tab === "offpeak" && <OffPeak data={dataOff} />}
         {tab === "explain" && <XAIExplainPanel activeModel={activeModel} />}
       </Panel>
-      
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

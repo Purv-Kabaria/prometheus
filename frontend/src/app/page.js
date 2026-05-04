@@ -294,13 +294,6 @@ export default function GridOfficerDashboard() {
           onSubmit={handleModalSubmit}
         />
       )}
-      
-      <style jsx>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
