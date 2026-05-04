@@ -34,6 +34,9 @@ export default function AgentDecisionsPage() {
     if (saved) {
       try { setMessages(JSON.parse(saved)); } catch (e) { }
     }
+    setMessages([
+      { role: 'agent', text: 'Prometheus Intelligence online. I am monitoring the grid for imbalances and maintenance opportunities. How can I assist you today?', timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }
+    ]);
   }, []);
 
   useEffect(() => {
@@ -287,8 +290,12 @@ export default function AgentDecisionsPage() {
             <h4 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>
               Prometheus Intelligence Chat
             </h4>
-            <button
-              onClick={() => { setMessages(defaultMessages); sessionStorage.removeItem('prometheus_chat'); }}
+            <button 
+              onClick={() => { 
+                const defaultMsg = [{ role: 'agent', text: 'Prometheus Intelligence online. I am monitoring the grid for imbalances and maintenance opportunities. How can I assist you today?', timestamp: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }];
+                setMessages(defaultMsg); 
+                sessionStorage.removeItem('prometheus_chat'); 
+              }}
               style={{ background: "transparent", border: "1px solid var(--surface-border)", borderRadius: "4px", color: "var(--muted)", fontSize: "10px", fontWeight: "600", padding: "4px 8px", cursor: "pointer", transition: "all 0.2s" }}
               onMouseOver={(e) => e.target.style.background = 'var(--surface)'}
               onMouseOut={(e) => e.target.style.background = 'transparent'}

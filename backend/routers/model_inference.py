@@ -311,6 +311,23 @@ def _adani_features_dict(hour: int, weekday: int) -> dict:
     month = datetime.now().month
     month_sin = math.sin(2 * math.pi * month / 12)
     month_cos = math.cos(2 * math.pi * month / 12)
+    
+    base = BASE_MW_GJ * HOUR_PROFILE[hour] * DAY_FACTOR[weekday]
+    lag_1 = BASE_MW_GJ * HOUR_PROFILE[(hour - 1) % 24] * DAY_FACTOR[weekday]
+    lag_24 = base
+    lag_168 = base * DAY_FACTOR[(weekday - 7) % 7] / max(DAY_FACTOR[weekday], 0.01)
+    
+    rolling_mean_24 = base
+    rolling_std_24 = base * 0.02
+    is_business_hour = 1 if 9 <= hour <= 18 and not is_weekend else 0
+    is_holiday = 0
+    ema_12 = base
+    ema_24 = base
+    diff_1 = base - lag_1
+    diff_24 = 0
+    rolling_max_24 = base * 1.05
+    rolling_max_168 = base * 1.05
+    covid_severity = 0
 
     def _demand(h, wd):
         val = ADANI_BASE_MW * ADANI_HOUR_PROFILE[h % 24] * ADANI_DAY_FACTOR[wd % 7]
@@ -372,7 +389,8 @@ def _adani_features(hour: int, weekday: int) -> list:
         d["rolling_mean_24"], d["rolling_std_24"], d["is_business_hour"],
         d["is_holiday"], d.get("ema_12", 0.0), d.get("ema_24", 0.0),
         d.get("diff_1", 0.0), d.get("diff_24", 0.0),
-        d.get("rolling_max_24", 0.0), d.get("rolling_max_168", 0.0)
+        d.get("rolling_max_24", 0.0), d.get("rolling_max_168", 0.0),
+        d.get("covid_severity", 0.0)
     ]
 
 
@@ -544,7 +562,7 @@ def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
             feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos',
                              'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24',
                              'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24',
-                             'rolling_max_24', 'rolling_max_168', 'covid_severity']
+                             'rolling_max_24', 'rolling_max_168']
 
         feat_list = []
         for col in feature_names:
@@ -557,11 +575,18 @@ def _predict_adani(model_key: str, hour: int, weekday: int) -> Tuple[float, floa
             days_ahead = (weekday - now.weekday()) % 7
             mock_date = now + timedelta(days=days_ahead)
             mock_date = mock_date.replace(hour=hour, minute=0, second=0, microsecond=0)
+            
+            feat = np.array([_adani_features(hour, weekday)])
+            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168', 'covid_severity']
+            df = pd.DataFrame(feat, columns=feature_names)
             df['ds'] = [mock_date]
             
             pred = model.predict(df)
             p50 = float(pred['yhat'].iloc[0])
         else:
+            feat = np.array([_adani_features(hour, weekday)])
+            feature_names = ['dayofweek', 'is_weekend', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'lag_1', 'lag_24', 'lag_168', 'rolling_mean_24', 'rolling_std_24', 'is_business_hour', 'is_holiday', 'ema_12', 'ema_24', 'diff_1', 'diff_24', 'rolling_max_24', 'rolling_max_168', 'covid_severity']
+            df = pd.DataFrame(feat, columns=feature_names)
             p50 = float(model.predict(df)[0])
             
         if model_key == "adani_xgboost" and p50 < 10.0:

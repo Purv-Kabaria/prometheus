@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Card from '@/components/Card';
+import { useIsClient } from '@/hooks/useIsClient';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 const GEN_API = 'http://127.0.0.1:8000/api/live-comparison/generation';
@@ -27,6 +28,7 @@ export default function GridSimulationPage() {
   const [telemetry, setTelemetry] = useState(null);
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(true);
+  const isClient = useIsClient();
 
   const fetchData = async () => {
     try {
@@ -178,6 +180,7 @@ export default function GridSimulationPage() {
         <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "24px", display: "flex", flexDirection: "column" }}>
           <h3 style={{ fontSize: "14px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", marginBottom: "16px" }}>Real-time Mix</h3>
           <div style={{ position: "relative", width: "100%", height: "300px" }}>
+            {isClient ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -201,6 +204,7 @@ export default function GridSimulationPage() {
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
+            ) : <div style={{ width: "100%", height: "100%", minHeight: 300 }} />}
           </div>
         </div>
       </div>

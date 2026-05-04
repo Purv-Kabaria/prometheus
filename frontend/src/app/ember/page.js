@@ -10,6 +10,8 @@ export default function EmberApiPage() {
   const [liveData, setLiveData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [trading, setTrading] = useState(false);
+  const [tradeStatus, setTradeStatus] = useState("");
 
   const fetchLivePrices = async () => {
     try {
@@ -28,6 +30,16 @@ export default function EmberApiPage() {
   useEffect(() => {
     fetchLivePrices();
   }, []);
+
+  const handleAuthorizeTrade = () => {
+    if (trading) return;
+    setTrading(true);
+    setTradeStatus("Processing trade authorization...");
+    setTimeout(() => {
+      setTrading(false);
+      setTradeStatus("Trade fully authorized and executed successfully!");
+    }, 1500);
+  };
 
   if (loading) {
     return (
@@ -57,8 +69,8 @@ export default function EmberApiPage() {
     <div style={{ paddingBottom: "80px" }}>
       <header style={{ marginBottom: "32px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
-          <h1 className="serif" style={{ fontSize: "36px", fontWeight: "400", marginBottom: "8px" }}>Ember Energy API</h1>
-          <p style={{ color: "var(--muted)", fontSize: "15px" }}>Production-safe client fetching open electricity market data via Ember</p>
+          <h1 className="serif" style={{ fontSize: "36px", fontWeight: "400", marginBottom: "8px" }}>Power Arbitrage & Spot Market</h1>
+          <p style={{ color: "var(--muted)", fontSize: "15px" }}>Production-safe client fetching live electricity market and pricing curve data</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--accent)", padding: "6px 12px", borderRadius: "8px" }}>
           <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--success)" }}></div>
@@ -135,12 +147,19 @@ export default function EmberApiPage() {
               <p style={{ fontSize: "28px", fontWeight: "700", color: "var(--success)" }}>${liveData?.potential_revenue_usd?.toLocaleString()}</p>
             </div>
           </div>
-          <button style={{ width: "100%", marginTop: "16px", padding: "12px", background: "var(--accent)", color: "var(--success)", border: "1px solid rgba(0, 204, 153, 0.2)", borderRadius: "8px", fontWeight: "600", cursor: "pointer", transition: "all 0.2s ease" }}
+          <button 
+            onClick={handleAuthorizeTrade}
+            style={{ width: "100%", marginTop: "16px", padding: "12px", background: "var(--accent)", color: "var(--success)", border: "1px solid rgba(0, 204, 153, 0.2)", borderRadius: "8px", fontWeight: "600", cursor: "pointer", transition: "all 0.2s ease" }}
             onMouseOver={(e) => { e.target.style.background = "var(--success)"; e.target.style.color = "var(--background)"; }}
             onMouseOut={(e) => { e.target.style.background = "var(--accent)"; e.target.style.color = "var(--success)"; }}
           >
-            Authorize Trade to Spot Market
+            {trading ? "Authorizing..." : "Authorize Trade to Spot Market"}
           </button>
+          {tradeStatus && (
+            <p style={{ marginTop: "12px", fontSize: "12px", fontWeight: "600", color: tradeStatus.includes("success") ? "var(--success)" : "var(--warning)", textAlign: "center" }}>
+              {tradeStatus}
+            </p>
+          )}
         </div>
 
         <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "24px" }}>

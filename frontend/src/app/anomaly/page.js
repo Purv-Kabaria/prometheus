@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import ReactMarkdown from "react-markdown";
 import Card from "@/components/Card";
+import { useIsClient } from "@/hooks/useIsClient";
 
 const API_BASE = "http://localhost:8000";
 
@@ -83,6 +84,8 @@ export default function AnomalyPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [windowHours, setWindowHours] = useState(72);
   const [selectedId, setSelectedId] = useState(null);
+
+  const isClient = useIsClient();
 
   const load = useCallback(async () => {
     setError("");
@@ -370,7 +373,7 @@ export default function AnomalyPage() {
             <div style={{ padding: "60px", textAlign: "center", color: "var(--muted)" }}>
               <p style={{ fontSize: "14px" }}>No operational data detected. Ensure grid streams are active.</p>
             </div>
-          ) : (
+          ) : isClient ? (
             <ResponsiveContainer width="100%" height={320}>
               <ComposedChart data={chartSlice} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--surface-border)" />
@@ -401,6 +404,8 @@ export default function AnomalyPage() {
                 <Line type="monotone" dataKey="mwh" name="MWh" stroke="var(--success)" strokeWidth={2} dot={false} opacity={0.3} />
               </ComposedChart>
             </ResponsiveContainer>
+          ) : (
+            <div style={{ width: "100%", height: 320 }} />
           )}
         </div>
 
