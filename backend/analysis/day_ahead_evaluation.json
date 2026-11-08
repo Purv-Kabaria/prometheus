@@ -16,7 +16,23 @@
       "dow",
       "lag_48",
       "roll_mean_168"
-    ]
+    ],
+    "feature_gain_share_pct": {
+      "lag_24": 56.4,
+      "lag_168": 13.65,
+      "dow": 4.58,
+      "lag_48": 4.19,
+      "roll_mean_168": 3.8,
+      "month_cos": 3.21,
+      "roll_mean_24": 3.07,
+      "lag_336": 2.38,
+      "lag_72": 2.15,
+      "hour_sin": 1.86,
+      "roll_std_24": 1.81,
+      "hour_cos": 1.22,
+      "month_sin": 1.03,
+      "is_weekend": 0.66
+    }
   },
   "hour_ahead": {
     "horizon_hours": 1,

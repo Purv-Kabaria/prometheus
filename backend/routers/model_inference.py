@@ -66,9 +66,9 @@ _scaler_y  = None
 _tcn_meta: Dict = {}
 
 MODEL_STATUS: Dict[str, Dict] = {
-    "synthetic": {"loaded": True,  "error": None, "mape": "~3.5%"},
-    "lgbm":      {"loaded": False, "error": None, "mape": "~2.8%"},
-    "tcn_xgb":   {"loaded": False, "error": None, "mape": "1.54%"},
+    "synthetic": {"loaded": True,  "error": None, "mape": "n/a"},
+    "lgbm":      {"loaded": False, "error": None, "mape": "2.59% (ref.)"},
+    "tcn_xgb":   {"loaded": False, "error": None, "mape": "not re-evaluated"},
 }
 
 ADANI_KEYS = {
@@ -609,9 +609,9 @@ def get_model_registry() -> list:
         {
             "key": "synthetic",
             "name": "Synthetic Baseline",
-            "description": "Deterministic demand profile with realistic noise. Always available.",
+            "description": "Deterministic demand profile with noise, for demos when no trained model is loaded. Not a forecast.",
             "type": "Rule-based",
-            "mape": "~3.5%",
+            "mape": "n/a",
             "quantiles": True,
             "loaded": True,
             "error": None,
@@ -619,9 +619,9 @@ def get_model_registry() -> list:
         {
             "key": "tcn_xgb",
             "name": "TCN + XGBoost (Final Submission)",
-            "description": "Temporal Convolutional Network as base model with XGBoost error-corrector. Achieved 1.54% MAPE.",
+            "description": "Temporal convolutional network with an XGBoost error corrector (the hackathon submission). Its inputs include the previous hour's demand, so its hackathon score reflects one-hour-ahead accuracy; it has not been re-evaluated day-ahead.",
             "type": "Deep Learning + Boosting",
-            "mape": "1.54%",
+            "mape": "not re-evaluated",
             "quantiles": False,
             "loaded": MODEL_STATUS["tcn_xgb"]["loaded"],
             "error": MODEL_STATUS["tcn_xgb"]["error"],

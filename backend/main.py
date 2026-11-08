@@ -60,7 +60,7 @@ if not os.path.exists("models/registry.json"):
                     "created_at":   "initial",
                     "parent":       None,
                     "artefact_dir": "models/final_submission",
-                    "mape":         "1.54%",
+                    "mape":         "not re-evaluated",
                     "note":         "Original submission model",
                     "activated_at": datetime.now(timezone.utc).isoformat(),
                 }

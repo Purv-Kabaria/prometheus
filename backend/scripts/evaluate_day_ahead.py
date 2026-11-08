@@ -157,7 +157,10 @@ def evaluate(min_lag: int) -> dict:
         for name, lag in (("naive_same_hour_yesterday", 24), ("naive_same_hour_last_week", 168)):
             result[f"{name}_test_mape_2021"] = round(mape(y_te, s.shift(lag)[te].to_numpy()), 3)
         imp = pd.Series(final.booster_.feature_importance("gain"), index=X.columns)
-        result["top_features_by_gain"] = imp.sort_values(ascending=False).head(5).index.tolist()
+        share = (100 * imp / imp.sum()).sort_values(ascending=False)
+        result["top_features_by_gain"] = share.head(5).index.tolist()
+        # Share of total split gain per feature, in percent. Shown on the Insights page.
+        result["feature_gain_share_pct"] = {k: round(float(v), 2) for k, v in share.items()}
     return result
 
 

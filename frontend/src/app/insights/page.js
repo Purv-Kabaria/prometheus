@@ -6,54 +6,43 @@ import { useIsClient } from "@/hooks/useIsClient";
 
 export default function InsightsPage() {
   const isClient = useIsClient();
-  // Derived from notebook SHAP waterfall output (forecasting_models.ipynb, viz_30)
-  // Values are absolute SHAP magnitudes converted to percentage share.
-  const shapRawImpacts = [
-    { feature: "lag_1", impact: -908.01 },
-    { feature: "hour_sin", impact: -61.29 },
-    { feature: "hour_cos", impact: 35.46 },
-    { feature: "month_cos", impact: 32.23 },
-    { feature: "rolling_mean_24", impact: -23.04 },
-    { feature: "lag_168", impact: -16.52 },
-    { feature: "lag_24", impact: -15.70 },
-    { feature: "month_sin", impact: -12.92 },
-    { feature: "ema_12", impact: -12.58 },
-    { feature: "other_features", impact: 12.58 },
-  ];
-
-  const totalAbsImpact = shapRawImpacts.reduce((sum, row) => sum + Math.abs(row.impact), 0);
-  const shapData = shapRawImpacts.map((row) => ({
-    feature: row.feature,
-    contribution: Number(((Math.abs(row.impact) / totalAbsImpact) * 100).toFixed(2)),
-  }));
+  // Share of total split gain per feature for the day-ahead LightGBM model,
+  // from backend/analysis/day_ahead_evaluation.json (scripts/evaluate_day_ahead.py).
+  // Every feature is at least 24 hours old at prediction time, so nothing here
+  // can leak the value being forecast.
+  const gainShare = {
+    lag_24: 56.4, lag_168: 13.65, dow: 4.58, lag_48: 4.19, roll_mean_168: 3.8,
+    month_cos: 3.21, roll_mean_24: 3.07, lag_336: 2.38, lag_72: 2.15, hour_sin: 1.86,
+  };
+  const importanceData = Object.entries(gainShare).map(([feature, contribution]) => ({ feature, contribution }));
 
   return (
     <div style={{ paddingBottom: "80px" }}>
       <header style={{ marginBottom: "48px" }}>
         <h1 className="serif" style={{ fontSize: "36px", fontWeight: "400", marginBottom: "8px" }}>Model insights</h1>
-        <p style={{ color: "var(--muted)", fontSize: "15px" }}>Cost reduction analysis and feature explainability metrics</p>
+        <p style={{ color: "var(--muted)", fontSize: "15px" }}>How accurate the day-ahead forecast is, and what it relies on</p>
       </header>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "48px" }}>
-        <Card title="Avoided Expenditure (MTD)" value="$42,500" subtext="Savings from optimized unit commitment" accentColor="var(--success)" />
-        <Card title="Grid Efficiency" value="+12.4%" subtext="Reduction in over-generation waste" accentColor="var(--primary)" />
-        <Card title="Peak Flattening" value="Active" subtext="Pattern shift detected in Sector C" accentColor="var(--warning)" />
+        <Card title="Day-ahead MAPE" value="2.59%" subtext="LightGBM on held-out 2021, features 24h+ old" accentColor="var(--success)" />
+        <Card title="Naive baseline" value="3.73%" subtext="Same hour yesterday, same test year" accentColor="var(--primary)" />
+        <Card title="Error reduction" value="30%" subtext="vs the best naive forecast" accentColor="var(--warning)" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "48px", alignItems: "start" }}>
-        {/* SHAP Panel */}
+        {/* Feature importance panel */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "32px" }}>
           <div style={{ marginBottom: "32px" }}>
-            <h3 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Feature Impact (SHAP)</h3>
+            <h3 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Feature importance (share of gain)</h3>
             <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "4px" }}>
-              Contribution share from notebook SHAP output (cell 33 / viz_29-viz_30), normalized by absolute SHAP magnitude.
+              Share of total split gain per feature in the day-ahead model (top 10). Daily (lag_24) and weekly (lag_168) history dominate, matching the periodogram.
             </p>
           </div>
           
           <div style={{ height: 320 }}>
             {isClient ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={shapData} margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
+              <BarChart layout="vertical" data={importanceData} margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--surface-border)" />
                 <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontSize: 10 }} />
                 <YAxis type="category" dataKey="feature" axisLine={false} tickLine={false} tick={{ fill: "var(--foreground)", fontSize: 12, fontWeight: 500 }} />
@@ -68,27 +57,31 @@ export default function InsightsPage() {
         {/* Demand Trend Analysis */}
         <aside style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: "var(--radius)", padding: "24px" }}>
-            <h4 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "20px" }}>
-              Trend analysis
+            <h4 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>
+              How this was measured
             </h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              <div>
-                <div style={{ fontSize: "18px", fontWeight: "600", color: "var(--success)" }}>-2.4% Annualized</div>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", marginTop: "2px" }}>Baseline Shift</div>
-                <p style={{ fontSize: "13px", color: "var(--muted)", marginTop: "8px", lineHeight: "1.5" }}>Industrial demand in Sector C continues downward trajectory due to efficiency upgrades.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase" }}>Horizon</div>
+                <p style={{ fontSize: "13px", color: "var(--foreground)", marginTop: "6px", lineHeight: "1.5" }}>24 hours ahead. Every input is at least a day old when the forecast is made.</p>
               </div>
-              <div style={{ borderTop: "1px solid var(--surface-border)", paddingTop: "24px" }}>
-                <div style={{ fontSize: "18px", fontWeight: "600", color: "var(--warning)" }}>Peak Flattening</div>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase", marginTop: "2px" }}>Load Distribution</div>
-                <p style={{ fontSize: "13px", color: "var(--muted)", marginTop: "8px", lineHeight: "1.5" }}>Evening peaks are widening, likely driven by residential EV charging load distribution.</p>
+              <div style={{ borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase" }}>Split</div>
+                <p style={{ fontSize: "13px", color: "var(--foreground)", marginTop: "6px", lineHeight: "1.5" }}>Train 2016-2019, tune on 2020, test once on 2021. Never shuffled.</p>
+              </div>
+              <div style={{ borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase" }}>Validation vs test</div>
+                <p style={{ fontSize: "13px", color: "var(--foreground)", marginTop: "6px", lineHeight: "1.5" }}>2.59% on both, so the model is not overfitting the tuning year.</p>
+              </div>
+              <div style={{ borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase" }}>Baselines</div>
+                <p style={{ fontSize: "13px", color: "var(--foreground)", marginTop: "6px", lineHeight: "1.5" }}>Same hour yesterday 3.73%, same hour last week 5.75%.</p>
+              </div>
+              <div style={{ borderTop: "1px solid var(--surface-border)", paddingTop: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", textTransform: "uppercase" }}>Reproduce</div>
+                <p style={{ fontSize: "13px", color: "var(--foreground)", marginTop: "6px", lineHeight: "1.5" }}>backend/scripts/evaluate_day_ahead.py</p>
               </div>
             </div>
-          </div>
-          
-          <div style={{ padding: "0 8px" }}>
-            <p style={{ fontSize: "12px", color: "var(--muted)", lineHeight: "1.5" }}>
-              Insights are generated by comparing live actuals against a multi-modal ensemble baseline. SHAP values indicate the local importance of input features for the current inference window.
-            </p>
           </div>
         </aside>
       </div>

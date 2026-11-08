@@ -21,6 +21,12 @@
 
 ---
 
+## Team and evaluation
+
+Team project that **won the Adani Powermind Hackathon 2026**. Purv Kabaria built the LightGBM forecaster, the data preparation and the LLM anomaly explanations; teammates built the dashboard, the TCN model, the agent and the simulation.
+
+**Honest accuracy:** the LightGBM model forecasts **24 hours ahead at 2.59% MAPE** on held-out 2021 (3.73% for "same hour yesterday"), with every feature at least a day old. Earlier figures (0.65%, the TCN's 1.54%) used the previous hour's demand as an input, so they measure one-hour-ahead accuracy. Details and the script: [backend/analysis/DAY_AHEAD_EVALUATION.md](backend/analysis/DAY_AHEAD_EVALUATION.md).
+
 ## 📸 Platform Preview
 
 ### Grid Control
@@ -77,7 +83,7 @@ The system is organized around four practical operating loops:
 - Multi-model forecasting console with full P10, P50, and P90 prediction bands
 - 7-day and 30-day planning views for procurement pressure, unit commitment, and maintenance windows
 - Peak spike detection and off-peak window discovery for storage, curtailment, and low-risk operations
-- XAI panel with SHAP-style and LIME-style interpretability outputs
+- Explainability panel: real SHAP (TreeExplainer) on the LightGBM P50 model when it is loaded, clearly labelled as simulated when it is not
 - Anomaly analysis console with residual baseline charts, event logs, acknowledgement flows, and LLM explanations
 - Live grid simulation covering generation mix, power-flow topology, and equipment health tracking
 - Agent decision page backed by MCP tools and Ollama for grid-specific decision support
@@ -251,7 +257,7 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 | `/reporting` | Historical operational intelligence, financial indicators, and generated PDF reports |
 | `/anomaly` | Anomaly detection console, event review, LLM explanation, chat, and acknowledgement |
 | `/agent` | Prometheus agent chat, proposal queue, and officer feedback workflow |
-| `/insights` | Cost, grid efficiency, and feature importance dashboard |
+| `/insights` | Day-ahead accuracy vs naive baselines and feature importance, from the leak-free evaluation |
 | `/upload` | CSV ingestion, retraining job monitoring, and model registry view |
 | `/ember` | Ember Energy market data and pricing workflow |
 

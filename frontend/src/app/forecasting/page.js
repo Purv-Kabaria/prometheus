@@ -567,7 +567,7 @@ function XAIExplainPanel({ activeModel }) {
     <>
       <SectionHeader
         title="Interpretability Analytics"
-        sub="Audit-ready feature attribution via SHAP (Global) and LIME (Local) methodologies"
+        sub={explainData?.source === "real_shap" ? "SHAP TreeExplainer on the LightGBM P50 model" : "Illustrative values: the LightGBM model is not loaded, so these are simulated"}
         tag="XAI Core Enabled"
       />
 
@@ -666,9 +666,9 @@ function XAIExplainPanel({ activeModel }) {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                 <h3 className="serif" style={{ fontSize: "18px", fontWeight: "400", display: "flex", alignItems: "center", gap: "10px" }}>
-                  Local Fit Integrity (LIME)
+                  Per-unit sensitivity (SHAP / feature value)
                 </h3>
-                <Badge label="Local Audit" color="success" />
+                <Badge label="Derived from SHAP" color="info" />
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>

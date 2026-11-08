@@ -12,7 +12,7 @@ Serves five key prediction products consumed by the Forecasting dashboard:
 All endpoints accept an optional ?model= query parameter:
   model=synthetic   (default) — deterministic Maharashtra profile
   model=lgbm        — LightGBM P10/P50/P90 quantile ensemble
-  model=tcn_xgb     — TCN + XGBoost final submission (1.54% MAPE, Gujarat)
+  model=tcn_xgb     — TCN + XGBoost hackathon submission (Gujarat); see analysis/DAY_AHEAD_EVALUATION.md
 """
 
 from __future__ import annotations
