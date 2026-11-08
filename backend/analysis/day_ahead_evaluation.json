@@ -1,0 +1,31 @@
+{
+  "day_ahead": {
+    "horizon_hours": 24,
+    "train_rows": 34624,
+    "val_rows": 8730,
+    "test_rows": 8757,
+    "trees": 269,
+    "val_mape_2020": 2.589,
+    "test_mape_2021": 2.594,
+    "test_mae_2021": 261.8,
+    "naive_same_hour_yesterday_test_mape_2021": 3.729,
+    "naive_same_hour_last_week_test_mape_2021": 5.75,
+    "top_features_by_gain": [
+      "lag_24",
+      "lag_168",
+      "dow",
+      "lag_48",
+      "roll_mean_168"
+    ]
+  },
+  "hour_ahead": {
+    "horizon_hours": 1,
+    "train_rows": 34624,
+    "val_rows": 8730,
+    "test_rows": 8757,
+    "trees": 2244,
+    "val_mape_2020": 1.002,
+    "test_mape_2021": 0.657,
+    "test_mae_2021": 63.5
+  }
+}
